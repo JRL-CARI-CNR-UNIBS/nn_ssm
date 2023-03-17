@@ -33,6 +33,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <iostream>
 #include <fstream>
 #include <random>
+#include <ros/package.h>
 
 struct Sample
 {
@@ -131,6 +132,7 @@ int main(int argc, char **argv)
   std::uniform_real_distribution<double> dist(0.0, 1.0);
 
   std::cout<<"Database creation starts"<<std::endl;
+  ros::Duration(5).sleep();
 
   unsigned int iter;
   double r, distance, slowest_joint_time;
@@ -140,6 +142,9 @@ int main(int argc, char **argv)
   std::vector<Sample> samples;
   std::vector<double> obstacle;
   std::vector<std::vector<double>> obstacles;
+
+  bool progress_bar_full = false;
+  unsigned int progress = 0;
 
   for(unsigned int i=0; i<n_samples; i++)
   {
@@ -186,10 +191,35 @@ int main(int argc, char **argv)
 
       samples.push_back(sample);
     }
+
+    progress = std::ceil(((double)(i+1.0))/((double)n_samples)*100.0);
+    if(progress%1 == 0 && not progress_bar_full)
+    {
+      std::string output = "\r[";
+
+      for(unsigned int j=0;j<progress/5.0;j++)
+        output = output+"=";
+
+      output = output+">] ";
+      output = "\033[1;41;42m"+output+std::to_string(progress)+"%\033[0m";  //1->bold, 37->foreground white, 42->background green
+
+      if(progress == 100)
+      {
+        progress_bar_full = true;
+        output = output+"\033[1;5;32m Succesfully completed!\033[0m\n";
+      }
+
+      std::cout<<output;
+    }
   }
 
   // Save params in a database
-  std::ofstream file_params("ssm_database_creation_params.bin", std::ios::out | std::ios::binary);
+  std::string path = ros::package::getPath("nn_ssm");
+  path = path+"/scripts/data/";
+
+  std::ofstream file_params;
+  file_params.open(path+"ssm_dataset_creation_params.bin", std::ios::out | std::ios::binary);
+
   const size_t bufsize = 1024 * 1024;
   std::unique_ptr<char[]> buf_params;
   buf_params.reset(new char[bufsize]);
@@ -215,7 +245,8 @@ int main(int argc, char **argv)
   file_params.close();
 
   // Save samples in a database
-  std::ofstream file("ssm_database.bin", std::ios::out | std::ios::binary);
+  std::ofstream file;
+  file.open(path+"ssm_dataset.bin", std::ios::out | std::ios::binary);
   std::unique_ptr<char[]> buf;
   buf.reset(new char[bufsize]);
 
@@ -239,12 +270,12 @@ int main(int argc, char **argv)
     Eigen::VectorXd::Map(&tmp[0], sample.dq.size()) = sample.dq;
     sample_vector.insert(sample_vector.end(),tmp.begin(),tmp.end());
 
-    // scaling
-    sample_vector.push_back(sample.scaling);
-
     //obstacles
     for(const std::vector<double>& obs:obstacles)
       sample_vector.insert(sample_vector.end(),obs.begin(),obs.end());
+
+    // scaling
+    sample_vector.push_back(sample.scaling);
 
     file.write((char*)&sample_vector[0], sample_vector.size()*sizeof(double));
   }

@@ -3,7 +3,7 @@ base_frame: "world"
 tool_frame: "flange"
 poi_names: ["a_forearm","b_mount_flange","b_forearm","flange"]
 
-ssm_max_step_size: 0.001
+max_step_size: 0.001
 max_cart_acc: 2.5
 Tr: 0.15
 min_distance: 0.2
@@ -13,4 +13,4 @@ n_objects: 1
 min_range: [-2,-2,0]
 max_range: [ 2, 2,0]
 
-n_samples: 1000000
+n_samples: 10
