@@ -72,19 +72,29 @@ if load_net:
     NN = torch.load(nn_path)
 else:
     NN = nn.Sequential(
-        nn.Linear(dof+dof+3, 500),
+        nn.Linear(dof+dof+3, 1000),
         nn.ReLU(),
-        nn.Linear(500, 1),
-        nn.ReLU()).to(device)
+        nn.Linear(1000, 500),
+        nn.ReLU(),
+        nn.Linear(500, 250),
+        nn.ReLU(),
+        nn.Linear(250, 125),
+        nn.ReLU(),
+        nn.Linear(125, 60),
+        nn.ReLU(),
+        nn.Linear(60, 1),
+        nn.ReLU()
+    ).to(device)
 
 print(NN)
 
 # Define loss function and optimizer
-criterion = torch.nn.MSELoss()
-# criterion = torch.nn.L1Loss()
 
-optimizer = optim.Adam(NN.parameters(), lr=0.001)
-# optimizer = optim.SGD(NN.parameters(), lr=0.001, momentum=0.9)
+criterion = torch.nn.L1Loss()
+#criterion = torch.nn.MSELoss()
+
+#optimizer = optim.Adam(NN.parameters(), lr=0.001)
+optimizer = optim.SGD(NN.parameters(), lr=0.001, momentum=0.9)
 
 # Train & Validation
 
@@ -92,16 +102,10 @@ optimizer = optim.Adam(NN.parameters(), lr=0.001)
 val_loss_over_epoches = []
 train_loss_over_epoches = []
 
-# fig, axs = plt.subplots(2)
-# fig = plt.Figure()
-# fig.set_size_inches(10, 10)
-# ax0 = fig.add_subplot(1,2,1)
-# ax1 = fig.add_subplot(1,2,2)
-
 fig, axs = plt.subplots(2)
 ax0 = axs[0]
 ax1 = axs[1]
-fig.set_size_inches(10,10)
+fig.set_size_inches(10, 10)
 
 for epoch in range(n_epochs):
 
@@ -181,11 +185,11 @@ for epoch in range(n_epochs):
 
     ax0.clear()
     ax0.set(xlabel="Epoches", ylabel="Loss",
-               title="Training and Validation Loss")
+            title="Training and Validation Loss")
     ax0.grid(True)
     ax0.plot(val_loss_over_epoches)
     ax0.plot(train_loss_over_epoches)
-    ax0.legend(["val","train"])
+    ax0.legend(["val", "train"])
 
     plt.show(block=False)
     plt.draw()
