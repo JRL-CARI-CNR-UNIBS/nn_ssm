@@ -11,10 +11,7 @@
   <node pkg="nn_ssm"
         name="create_dataset"
         type="create_dataset"
-        output="screen"
-        launch-prefix="gdb -ex run --args">
-        <!-- "gdb -ex run -XX-args" -->
-        <!-- valgrind -XX-leak-check=full -->
+        output="screen">
  </node>
 
 </launch>

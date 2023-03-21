@@ -53,6 +53,15 @@ int main(int argc, char **argv)
   spinner.start();
 
   // Get params
+  bool only_one_conf_per_conn;
+  nh.getParam("only_one_conf_per_conn",only_one_conf_per_conn);
+
+  int n_objects;
+  nh.getParam("n_objects",n_objects);
+
+  int n_samples;
+  nh.getParam("n_samples",n_samples);
+
   std::string group_name;
   nh.getParam("group_name",group_name);
 
@@ -76,12 +85,6 @@ int main(int argc, char **argv)
 
   double v_h;
   nh.getParam("v_h",v_h);
-
-  int n_object;
-  nh.getParam("n_object",n_object);
-
-  int n_samples;
-  nh.getParam("n_samples",n_samples);
 
   std::vector<std::string> poi_names;
   nh.getParam("poi_names",poi_names);
@@ -151,7 +154,7 @@ int main(int argc, char **argv)
     // Create obstacle locations
     obstacles.clear();
     ssm->clearObstaclesPositions();
-    for(unsigned int j=0;j<n_object;j++)
+    for(unsigned int j=0;j<n_objects;j++)
     {
       r=dist(gen); obs_location[0] = min_range.at(0)+(max_range.at(0)-min_range.at(0))*r;
       r=dist(gen); obs_location[1] = min_range.at(1)+(max_range.at(1)-min_range.at(1))*r;
@@ -168,11 +171,15 @@ int main(int argc, char **argv)
     parent = sampler->sample();
     child  = sampler->sample();
 
-    connection= (parent-child);
-    distance = connection.norm();
+    distance = (parent-child).norm();
 
     if(distance>1.0)
+    {
       child = parent+(child-parent)*1.0/distance;
+      distance = (parent-child).norm();
+    }
+
+    connection = (parent-child);
 
     iter = std::max(std::ceil((connection).norm()/max_step_size),1.0);
     delta_q = connection/iter;
@@ -190,6 +197,9 @@ int main(int argc, char **argv)
       sample.scaling = ssm->computeScalingFactorAtQ(sample.q,dq);
 
       samples.push_back(sample);
+
+      if(only_one_conf_per_conn)
+        break;
     }
 
     progress = std::ceil(((double)(i+1.0))/((double)n_samples)*100.0);
@@ -234,7 +244,7 @@ int main(int argc, char **argv)
   file_params.write((char*) &t_r          , sizeof(t_r                         ));
   file_params.write((char*) &min_distance , sizeof(min_distance                ));
   file_params.write((char*) &v_h          , sizeof(v_h                         ));
-  file_params.write((char*) &n_object     , sizeof(n_object                    ));
+  file_params.write((char*) &n_objects     , sizeof(n_objects                    ));
   file_params.write((char*) &n_samples    , sizeof(n_samples                   ));
   file_params.write((char*) &poi_names[0] , sizeof(std::string)*poi_names.size());
   file_params.write((char*) &min_range[0] , sizeof(double)     *min_range.size());
@@ -254,7 +264,7 @@ int main(int argc, char **argv)
 
   std::vector<double> tmp;
   std::vector<double> sample_vector;
-  for(const Sample sample:samples)
+  for(const Sample& sample:samples)
   {
     sample_vector.clear();
 
