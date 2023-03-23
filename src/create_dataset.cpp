@@ -52,15 +52,23 @@ int main(int argc, char **argv)
   ros::AsyncSpinner spinner(4);
   spinner.start();
 
+  std::srand(std::time(NULL));
+
   // Get params
   bool only_one_conf_per_conn;
   nh.getParam("only_one_conf_per_conn",only_one_conf_per_conn);
 
+  bool scale_input;
+  nh.getParam("scale_input",scale_input);
+
   int n_objects;
   nh.getParam("n_objects",n_objects);
 
-  int n_samples;
-  nh.getParam("n_samples",n_samples);
+  int n_iter;
+  nh.getParam("n_iter",n_iter);
+
+  int n_test_per_obs;
+  nh.getParam("n_test_per_obs",n_test_per_obs);
 
   std::string group_name;
   nh.getParam("group_name",group_name);
@@ -71,8 +79,8 @@ int main(int argc, char **argv)
   std::string tool_frame;
   nh.getParam("tool_frame",tool_frame);
 
-  double max_step_size;
-  nh.getParam("max_step_size",max_step_size);
+  int n_divisions;
+  nh.getParam("n_divisions",n_divisions);
 
   double max_cart_acc;
   nh.getParam("max_cart_acc",max_cart_acc);
@@ -119,9 +127,13 @@ int main(int argc, char **argv)
 
   Eigen::Vector3d grav; grav << 0, 0, -9.806;
   rosdyn::ChainPtr chain = rosdyn::createChain(*robot_model_loader->getURDF(),base_frame,tool_frame,grav);
-  Eigen::VectorXd inv_max_speed = chain->getDQMax().cwiseInverse();
+  Eigen::VectorXd max_speed  = chain->getDQMax();
+  Eigen::VectorXd min_speed  = -max_speed;
+  Eigen::VectorXd inv_max_speed  = max_speed.cwiseInverse();
+  Eigen::VectorXd inv_q_limits  = (ub-lb).cwiseInverse();
+  Eigen::VectorXd inv_speed_limits  = (max_speed-min_speed).cwiseInverse();
 
-  ssm15066_estimator::SSM15066Estimator2DPtr ssm = std::make_shared<ssm15066_estimator::SSM15066Estimator2D>(chain,max_step_size);
+  ssm15066_estimator::SSM15066Estimator2DPtr ssm = std::make_shared<ssm15066_estimator::SSM15066Estimator2D>(chain,0.001);
   ssm->setMaxCartAcc(max_cart_acc,false);
   ssm->setReactionTime(t_r,false);
   ssm->setMinDistance(min_distance,false);
@@ -137,72 +149,132 @@ int main(int argc, char **argv)
   std::cout<<"Database creation starts"<<std::endl;
   ros::Duration(5).sleep();
 
-  unsigned int iter;
-  double r, distance, slowest_joint_time;
+  double x, y, z, slowest_joint_time;
   Eigen::Vector3d obs_location;
-  Eigen::VectorXd parent, child, connection, dq, delta_q;
+  Eigen::VectorXd parent, child, connection, dq, delta_q, q, q_scaled, dq_scaled;
 
   std::vector<Sample> samples;
-  std::vector<double> obstacle;
+  std::vector<double> obs;
   std::vector<std::vector<double>> obstacles;
 
   bool progress_bar_full = false;
   unsigned int progress = 0;
 
-  for(unsigned int i=0; i<n_samples; i++)
+  for(unsigned int i=0; i<n_iter; i++)
   {
     // Create obstacle locations
     obstacles.clear();
     ssm->clearObstaclesPositions();
+
     for(unsigned int j=0;j<n_objects;j++)
     {
-      r=dist(gen); obs_location[0] = min_range.at(0)+(max_range.at(0)-min_range.at(0))*r;
-      r=dist(gen); obs_location[1] = min_range.at(1)+(max_range.at(1)-min_range.at(1))*r;
-      r=dist(gen); obs_location[2] = min_range.at(2)+(max_range.at(2)-min_range.at(2))*r;
+      x = dist(gen); obs_location[0] = min_range.at(0)+(max_range.at(0)-min_range.at(0))*x;
+      y = dist(gen); obs_location[1] = min_range.at(1)+(max_range.at(1)-min_range.at(1))*y;
+      z = dist(gen); obs_location[2] = min_range.at(2)+(max_range.at(2)-min_range.at(2))*z;
 
       ssm->addObstaclePosition(obs_location);
 
-      obstacle.clear();
-      obstacle = {obs_location[0],obs_location[1],obs_location[2]};
-      obstacles.push_back(obstacle);
+      if(scale_input)
+        obs = {x,y,z};
+      else
+        obs = {obs_location[0],obs_location[1],obs_location[2]};
+
+      obstacles.push_back(obs);
     }
 
-    // Select a random connection and consider points along it
-    parent = sampler->sample();
-    child  = sampler->sample();
-
-    distance = (parent-child).norm();
-
-    if(distance>1.0)
+    for(unsigned int k=0; k<n_test_per_obs; k++) //Test multiple robot configurations and velocities with the same set of obstacles
     {
-      child = parent+(child-parent)*1.0/distance;
-      distance = (parent-child).norm();
+      // Select a random connection and consider points along it
+      parent = sampler->sample();
+      child  = sampler->sample();
+
+      connection = (child-parent);
+      delta_q = connection/((double)n_divisions);
+
+      assert((delta_q*((double)n_divisions)-connection).norm()<1e-06);
+
+      // Joints velocity vector
+      slowest_joint_time = (inv_max_speed.cwiseProduct(connection)).cwiseAbs().maxCoeff();
+      dq = connection/slowest_joint_time;
+
+      for(unsigned int t=0;t<n_divisions+1;t++) //Test multiple robot configurations along the same connection
+      {
+        q = parent+t*delta_q;
+
+        // Scale input
+        if(scale_input)
+        {
+          q_scaled = (inv_q_limits).cwiseProduct(q-lb);
+          dq_scaled = (inv_speed_limits).cwiseProduct(dq-min_speed);
+        }
+        else
+        {
+          q_scaled = q;
+          dq_scaled = dq;
+        }
+
+        Sample sample;
+        sample.q = q_scaled;
+        sample.dq = dq_scaled;
+        sample.obstacles = obstacles;
+        sample.scaling = ssm->computeScalingFactorAtQ(q,dq); //q and dq, not q_scaled and dq_scaled!
+
+        samples.push_back(sample);
+
+        assert(sample.scaling>=1.0);
+        assert([&]() ->bool{
+                 if(scale_input)
+                 {
+                   for(unsigned int l=0;l<q_scaled.size();l++)
+                   {
+                     if(q_scaled[l]>1.0 || q_scaled[l]<0.0)
+                     {
+                       return false;
+                     }
+                   }
+
+                   for(unsigned int l=0;l<dq_scaled.size();l++)
+                   {
+                     if(dq_scaled[l]>1.0 || dq_scaled[l]<0.0)
+                     {
+                       return false;
+                     }
+                   }
+
+                   for(const std::vector<double>& tmp_vector:obstacles)
+                   {
+                     for(const double& tmp:tmp_vector)
+                     {
+                       if(tmp>1.0 || tmp<0.0)
+                       {
+                         return false;
+                       }
+                     }
+                   }
+                 }
+                 return true;
+               }());
+
+        if(only_one_conf_per_conn)
+          break;
+      }
+
+      assert([&]() ->bool{
+               if(not only_one_conf_per_conn)
+               {
+                 if((q-child).norm()>1e-04)
+                 {
+                   ROS_INFO_STREAM("q "<<q.transpose());
+                   ROS_INFO_STREAM("child "<<child.transpose());
+                   ROS_INFO_STREAM("err "<<(q-child).norm());
+                   return false;
+                 }
+               }
+               return true;
+             }());
     }
 
-    connection = (parent-child);
-
-    iter = std::max(std::ceil((connection).norm()/max_step_size),1.0);
-    delta_q = connection/iter;
-
-    // Joints velocity vector
-    slowest_joint_time = (inv_max_speed.cwiseProduct(connection)).cwiseAbs().maxCoeff();
-    dq = connection/slowest_joint_time;
-
-    for(unsigned int t=0;t<iter+1;t++)
-    {
-      Sample sample;
-      sample.q = parent+t*delta_q;
-      sample.dq = dq;
-      sample.obstacles = obstacles;
-      sample.scaling = ssm->computeScalingFactorAtQ(sample.q,dq);
-
-      samples.push_back(sample);
-
-      if(only_one_conf_per_conn)
-        break;
-    }
-
-    progress = std::ceil(((double)(i+1.0))/((double)n_samples)*100.0);
+    progress = std::ceil(((double)(i+1.0))/((double)n_iter)*100.0);
     if(progress%1 == 0 && not progress_bar_full)
     {
       std::string output = "\r[";
@@ -234,22 +306,23 @@ int main(int argc, char **argv)
   std::unique_ptr<char[]> buf_params;
   buf_params.reset(new char[bufsize]);
 
-  file_params.rdbuf()->pubsetbuf(buf_params.get(), bufsize);
+  file_params.rdbuf()->pubsetbuf(buf_params.get(), bufsize); n_test_per_obs;
 
-  file_params.write((char*) &group_name   , sizeof(group_name                  ));
-  file_params.write((char*) &base_frame   , sizeof(base_frame                  ));
-  file_params.write((char*) &tool_frame   , sizeof(tool_frame                  ));
-  file_params.write((char*) &max_step_size, sizeof(max_step_size               ));
-  file_params.write((char*) &max_cart_acc , sizeof(max_cart_acc                ));
-  file_params.write((char*) &t_r          , sizeof(t_r                         ));
-  file_params.write((char*) &min_distance , sizeof(min_distance                ));
-  file_params.write((char*) &v_h          , sizeof(v_h                         ));
-  file_params.write((char*) &n_objects     , sizeof(n_objects                    ));
-  file_params.write((char*) &n_samples    , sizeof(n_samples                   ));
-  file_params.write((char*) &poi_names[0] , sizeof(std::string)*poi_names.size());
-  file_params.write((char*) &min_range[0] , sizeof(double)     *min_range.size());
-  file_params.write((char*) &max_range[0] , sizeof(double)     *max_range.size());
-
+  file_params.write((char*) &scale_input   , sizeof(scale_input                 ));
+  file_params.write((char*) &group_name    , sizeof(group_name                  ));
+  file_params.write((char*) &base_frame    , sizeof(base_frame                  ));
+  file_params.write((char*) &tool_frame    , sizeof(tool_frame                  ));
+  file_params.write((char*) &n_divisions   , sizeof(n_divisions                 ));
+  file_params.write((char*) &max_cart_acc  , sizeof(max_cart_acc                ));
+  file_params.write((char*) &t_r           , sizeof(t_r                         ));
+  file_params.write((char*) &min_distance  , sizeof(min_distance                ));
+  file_params.write((char*) &v_h           , sizeof(v_h                         ));
+  file_params.write((char*) &n_objects     , sizeof(n_objects                   ));
+  file_params.write((char*) &n_iter        , sizeof(n_iter                      ));
+  file_params.write((char*) &n_test_per_obs, sizeof(n_test_per_obs              ));
+  file_params.write((char*) &poi_names[0]  , sizeof(std::string)*poi_names.size());
+  file_params.write((char*) &min_range[0]  , sizeof(double)     *min_range.size());
+  file_params.write((char*) &max_range[0]  , sizeof(double)     *max_range.size());
 
   file_params.flush();
   file_params.close();
@@ -281,17 +354,25 @@ int main(int argc, char **argv)
     sample_vector.insert(sample_vector.end(),tmp.begin(),tmp.end());
 
     //obstacles
-    for(const std::vector<double>& obs:obstacles)
+    for(const std::vector<double>& obs:sample.obstacles)
       sample_vector.insert(sample_vector.end(),obs.begin(),obs.end());
 
     // scaling
     sample_vector.push_back(sample.scaling);
+
+//    std::string txt = "obs: ";
+//    for(const std::vector<double>& obs:sample.obstacles)
+//      txt = txt+"("+std::to_string(obs[0])+","+std::to_string(obs[1])+","+std::to_string(obs[2])+") ";
+
+//    ROS_INFO_STREAM("q: "<<sample.q.transpose()<<" | dq: "<<sample.dq.transpose()<<" | "<<txt+"| scaling: "<<sample.scaling);
 
     file.write((char*)&sample_vector[0], sample_vector.size()*sizeof(double));
   }
 
   file.flush();
   file.close();
+
+  ROS_INFO_STREAM("Total number of samples -> "<<samples.size());
 
   return 0;
 }
