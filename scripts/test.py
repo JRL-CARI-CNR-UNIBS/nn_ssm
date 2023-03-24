@@ -12,8 +12,8 @@ max_scaling = 1000
 dataset_name = "ssm_dataset.bin"
 n_epochs = 1000
 
-n_inputs = 2
-batch_size = 4
+n_inputs = 10
+batch_size = 2
 
 # Get paths
 PATH = os.path.dirname(os.path.abspath(__file__)) + "/data/"
@@ -43,8 +43,8 @@ scalings = np.where(scalings > max_scaling, 0.0, (1.0 /
 # Create training and validation datasets
 
 # q, dq, (x,y,z) of obstacle (last column excluded)
-input = torch.Tensor(raw_data[:, 0:-1]).reshape(-1,cols-1)
-target = torch.Tensor(scalings).reshape(-1,1)
+input = torch.Tensor(raw_data[:, 0:-1]).reshape(-1, cols-1)
+target = torch.Tensor(scalings).reshape(-1, 1)
 
 # random shuffle
 indices = torch.randperm(input.size()[0])
@@ -68,7 +68,7 @@ val_dataloader = train_dataloader
 NN = nn.Sequential(
     nn.Linear(dof+dof+3, 100),
     nn.ReLU(),
-    nn.Linear(100,1),
+    nn.Linear(100, 1),
     nn.Sigmoid(),
 ).to(device)
 
@@ -77,10 +77,10 @@ print(NN)
 # Define loss function and optimizer
 
 criterion = torch.nn.L1Loss(reduction='sum')
-#criterion = torch.nn.MSELoss()
+# criterion = torch.nn.MSELoss()
 
 optimizer = optim.Adam(NN.parameters(), lr=0.001)
-#optimizer = optim.SGD(NN.parameters(), lr=0.001, momentum=0.7)
+# optimizer = optim.SGD(NN.parameters(), lr=0.001, momentum=0.7)
 
 # Train & Validation
 
@@ -88,11 +88,13 @@ optimizer = optim.Adam(NN.parameters(), lr=0.001)
 val_loss_over_epoches = []
 train_loss_over_epoches = []
 
-fig, axs = plt.subplots(3)
-ax0 = axs[0]
-ax1 = axs[1]
-ax2 = axs[2]
-fig.set_size_inches(10, 10)
+plt.rcParams["figure.figsize"] = [12, 15]
+ax = plt.GridSpec(2, 2)
+ax.update(wspace=0.5, hspace=0.5)
+
+ax0 = plt.subplot(ax[0, :])
+ax1 = plt.subplot(ax[1, 0])
+ax2 = plt.subplot(ax[1, 1])
 
 for epoch in range(n_epochs):
 
@@ -101,7 +103,8 @@ for epoch in range(n_epochs):
 
     NN.train()  # set training mode
 
-    train_loss = 0.0
+    train_loss_per_epoch = 0.0
+    val_loss_per_epoch = 0.0
 
     for i, batch in enumerate(train_dataloader, 0):  # batches
         # get the inputs -> batch is a list of [inputs, targets]
@@ -109,7 +112,7 @@ for epoch in range(n_epochs):
         batch_input = batch_input.to(device)
         batch_targets = batch_targets.to(device)
 
-        #batch_targets = batch_targets.unsqueeze(1)
+        # batch_targets = batch_targets.unsqueeze(1)
 
         # zero the parameter gradients
         optimizer.zero_grad()
@@ -124,15 +127,14 @@ for epoch in range(n_epochs):
         optimizer.step()
 
         # print current performance
-        #train_loss += (loss.item()*batch_targets.size()[0])
-        train_loss += loss.item()
+        # train_loss_per_epoch += (loss.item()*batch_targets.size()[0])
+        train_loss_per_epoch += loss.item()
 
         print('[%d, %5d] loss: %.3f' %
-                (epoch + 1, i + 1, loss.item()))
+              (epoch + 1, i + 1, loss.item()))
 
     # Validation phase
 
-    val_loss = 0.0
     with torch.no_grad():  # evaluation does not need gradients computation
         NN.eval()  # set evaluation mode
 
@@ -145,12 +147,12 @@ for epoch in range(n_epochs):
             batch_input = batch_input.to(device)
             batch_targets = batch_targets.to(device)
 
-            #batch_targets = batch_targets.unsqueeze(1)
+            # batch_targets = batch_targets.unsqueeze(1)
 
             predictions = NN(batch_input)
             loss = criterion(predictions, batch_targets)
-            # val_loss += (loss.item()*batch_targets.size()[0])
-            val_loss += loss.item()
+            # val_loss_per_epoch += (loss.item()*batch_targets.size()[0])
+            val_loss_per_epoch += loss.item()
 
             val_output.extend(predictions.detach().cpu().numpy())
             val_targets.extend(batch_targets.detach().cpu().numpy())
@@ -158,11 +160,8 @@ for epoch in range(n_epochs):
             ).numpy())
 
     # Plot figures
-    train_epoch_loss = train_loss/(epoch+1)
-    train_loss_over_epoches.append(train_epoch_loss)
-
-    val_epoch_loss = val_loss/(epoch+1)
-    val_loss_over_epoches.append(val_epoch_loss)
+    train_loss_over_epoches.append(train_loss_per_epoch/len(train_dataloader))
+    val_loss_over_epoches.append(val_loss_per_epoch/len(val_dataloader))
 
     ax0.clear()
     ax0.set(xlabel="Epoches", ylabel="Loss",

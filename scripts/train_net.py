@@ -93,11 +93,13 @@ optimizer = optim.Adam(NN.parameters(), lr=0.001)
 val_loss_over_epoches = []
 train_loss_over_epoches = []
 
-fig, axs = plt.subplots(3)
-ax0 = axs[0]
-ax1 = axs[1]
-ax2 = axs[2]
-fig.set_size_inches(10, 10)
+plt.rcParams["figure.figsize"] = [12, 15]
+ax = plt.GridSpec(2, 2)
+ax.update(wspace=0.5, hspace=0.5)
+
+ax0 = plt.subplot(ax[0, :])
+ax1 = plt.subplot(ax[1, 0])
+ax2 = plt.subplot(ax[1, 1])
 
 for epoch in range(n_epochs):
 
@@ -106,7 +108,8 @@ for epoch in range(n_epochs):
 
     NN.train()  # set training mode
 
-    train_loss = 0.0
+    train_loss_per_epoch = 0.0
+    val_loss_per_epoch = 0.0
     batches_loss = 0.0
 
     for i, batch in enumerate(train_dataloader, 0):  # batches
@@ -129,11 +132,11 @@ for epoch in range(n_epochs):
 
         # print current performance
         #train_loss += (loss.item()*batch_targets.size()[0])
-        train_loss += loss.item()
+        train_loss_per_epoch += loss.item()
 
         batches_loss += loss.item()
         if i % 1000 == 999:    # print every 1000 mini-batches
-            print('[%d, %5d] loss: %.3f' %
+            print('[%d, %5d] batch loss: %.3f' %
                   (epoch + 1, i + 1, batches_loss/1000))
             batches_loss = 0.0
 
@@ -141,7 +144,6 @@ for epoch in range(n_epochs):
         # Validation phase
         print("----- VALIDATION -----")
 
-        val_loss = 0.0
         with torch.no_grad():  # evaluation does not need gradients computation
             NN.eval()  # set evaluation mode
 
@@ -157,7 +159,7 @@ for epoch in range(n_epochs):
                 predictions = NN(batch_input)
                 loss = criterion(predictions, batch_targets)
                 # val_loss += (loss.item()*batch_targets.size()[0])
-                val_loss += loss.item()
+                val_loss_per_epoch += loss.item()
 
                 val_output.extend(predictions.detach().cpu().numpy())
                 val_targets.extend(batch_targets.detach().cpu().numpy())
@@ -166,11 +168,8 @@ for epoch in range(n_epochs):
 
     # Plot figures 
     if True:  # epoch % 10 == 9:
-        train_epoch_loss = train_loss/(epoch+1)
-        train_loss_over_epoches.append(train_epoch_loss)
-
-        val_epoch_loss = val_loss/(epoch+1)
-        val_loss_over_epoches.append(val_epoch_loss)
+        train_loss_over_epoches.append(train_loss_per_epoch/len(train_dataloader))
+        val_loss_over_epoches.append(val_loss_per_epoch/len(val_dataloader))
 
         ax0.clear()
         ax0.set(xlabel="Epoches", ylabel="Loss",
@@ -198,4 +197,4 @@ for epoch in range(n_epochs):
 
     # Save NN at each epoch
     torch.save(NN, nn_path)
-    fig.savefig(fig_path, dpi=300)
+    plt.savefig(fig_path, dpi=300)
