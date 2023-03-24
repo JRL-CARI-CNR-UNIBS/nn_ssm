@@ -46,8 +46,8 @@ scalings = np.where(scalings > max_scaling, 0.0, (1.0 /
 # Create training and validation datasets
 
 # q, dq, (x,y,z) of obstacle (last column excluded)
-input = torch.Tensor(raw_data[:, 0:-1], dtype=torch.float32).reshape(-1,cols-1)
-target = torch.Tensor(scalings, dtype=torch.float32).reshape(-1,1)
+input = torch.Tensor(raw_data[:, 0:-1]).reshape(-1,cols-1)
+target = torch.Tensor(scalings).reshape(-1,1)
 
 # random shuffle
 indices = torch.randperm(input.size()[0])
@@ -153,8 +153,6 @@ for epoch in range(n_epochs):
                 batch_input, batch_targets = batch
                 batch_input = batch_input.to(device)
                 batch_targets = batch_targets.to(device)
-
-                batch_targets = batch_targets.unsqueeze(1)
 
                 predictions = NN(batch_input)
                 loss = criterion(predictions, batch_targets)
