@@ -13,7 +13,8 @@ fig_name = str(dof)+"dof.png"
 nn_name = "nn_ssm.pt"
 dataset_name = "ssm_dataset.bin"
 batch_size = 32
-n_epochs = 500
+n_epochs = 1000
+perc_train = 0.8
 
 # Get paths
 PATH = os.path.dirname(os.path.abspath(__file__)) + "/data/"
@@ -45,17 +46,15 @@ scalings = np.where(scalings > max_scaling, 0.0, (1.0 /
 # Create training and validation datasets
 
 # q, dq, (x,y,z) of obstacle (last column excluded)
-input = torch.Tensor(raw_data[:, 0:-1])
-target = torch.Tensor(scalings)
+input = torch.Tensor(raw_data[:, 0:-1], dtype=torch.float32).reshape(-1,cols-1)
+target = torch.Tensor(scalings, dtype=torch.float32).reshape(-1,1)
 
 # random shuffle
 indices = torch.randperm(input.size()[0])
 input = input[indices]
 target = target[indices]
 
-dataset = torch.utils.data.TensorDataset(input, target)  # create your datset
-
-train_size = int(rows*0.8)
+train_size = int(rows*perc_train)
 val_size = rows-train_size
 
 train_dataset = torch.utils.data.TensorDataset(
@@ -63,56 +62,30 @@ train_dataset = torch.utils.data.TensorDataset(
 val_dataset = torch.utils.data.TensorDataset(
     input[train_size:, :], target[train_size:])   # create your validation datset
 
-if train_size == rows:
-    val_dataset = train_dataset
-
 train_dataloader = torch.utils.data.DataLoader(
-    dataset=train_dataset, batch_size=batch_size, shuffle=True)
+    dataset=train_dataset, batch_size=batch_size, shuffle=True, drop_last=True)
 val_dataloader = torch.utils.data.DataLoader(
-    dataset=val_dataset, batch_size=batch_size, shuffle=True)
+    dataset=val_dataset, batch_size=batch_size, shuffle=True, drop_last=True)
 
 if load_net:
     NN = torch.load(nn_path)
 else:
     NN = nn.Sequential(
-        nn.Linear(dof+dof+3, 500),
+        nn.Linear(dof+dof+3, 100),
         nn.ReLU(),
-        nn.Linear(500, 100),
-        nn.ReLU(),
-        nn.Linear(100, 50),
-        nn.ReLU(),
-        nn.Linear(50, 10),
-        nn.ReLU(),
-        nn.Linear(10, 1),
-        nn.Softmax(dim=0)  # to get values between 0.0 and 1.0
+        nn.Linear(100,1),
+        nn.Sigmoid()
     ).to(device)
-    # NN = nn.Sequential(
-    #     nn.Linear(dof+dof+3, 1000),
-    #     nn.ReLU(),
-    #     nn.Linear(1000, 500),
-    #     nn.ReLU(),
-    #     nn.Linear(500, 250),
-    #     nn.ReLU(),
-    #     nn.Linear(250, 125),
-    #     nn.ReLU(),
-    #     nn.Linear(125, 60),
-    #     nn.ReLU(),
-    #     nn.Linear(60, 30),
-    #     nn.ReLU(),
-    #     nn.Linear(30, 15),
-    #     nn.ReLU(),
-    #     nn.Linear(15, 1)
-    # ).to(device)
 
 print(NN)
 
 # Define loss function and optimizer
 
-criterion = torch.nn.L1Loss()
-# criterion = torch.nn.MSELoss()
+criterion = torch.nn.L1Loss(reduction='sum')
+#criterion = torch.nn.MSELoss()
 
-# optimizer = optim.Adam(NN.parameters(), lr=0.001)
-optimizer = optim.SGD(NN.parameters(), lr=0.001, momentum=0.7)
+optimizer = optim.Adam(NN.parameters(), lr=0.001)
+#optimizer = optim.SGD(NN.parameters(), lr=0.001, momentum=0.7)
 
 # Train & Validation
 
@@ -120,9 +93,10 @@ optimizer = optim.SGD(NN.parameters(), lr=0.001, momentum=0.7)
 val_loss_over_epoches = []
 train_loss_over_epoches = []
 
-fig, axs = plt.subplots(2)
+fig, axs = plt.subplots(3)
 ax0 = axs[0]
 ax1 = axs[1]
+ax2 = axs[2]
 fig.set_size_inches(10, 10)
 
 for epoch in range(n_epochs):
@@ -141,8 +115,6 @@ for epoch in range(n_epochs):
         batch_input = batch_input.to(device)
         batch_targets = batch_targets.to(device)
 
-        batch_targets = batch_targets.unsqueeze(1)
-
         # zero the parameter gradients
         optimizer.zero_grad()
 
@@ -156,7 +128,8 @@ for epoch in range(n_epochs):
         optimizer.step()
 
         # print current performance
-        train_loss += (loss.item()*batch_targets.size()[0])
+        #train_loss += (loss.item()*batch_targets.size()[0])
+        train_loss += loss.item()
 
         batches_loss += loss.item()
         if i % 1000 == 999:    # print every 1000 mini-batches
@@ -164,7 +137,7 @@ for epoch in range(n_epochs):
                   (epoch + 1, i + 1, batches_loss/1000))
             batches_loss = 0.0
 
-    if epoch % 10 == 9:  # Validation every 10 epochs
+    if True:  # epoch % 10 == 9:  # Validation every 10 epochs
         # Validation phase
         print("----- VALIDATION -----")
 
@@ -173,6 +146,7 @@ for epoch in range(n_epochs):
             NN.eval()  # set evaluation mode
 
             val_targets = []
+            val_output = []
             predictions_errors = []
             for i, batch in enumerate(val_dataloader, 0):
                 # get the inputs -> batch is a list of [inputs, targets]
@@ -184,18 +158,20 @@ for epoch in range(n_epochs):
 
                 predictions = NN(batch_input)
                 loss = criterion(predictions, batch_targets)
-                val_loss += (loss.item()*batch_targets.size()[0])
+                # val_loss += (loss.item()*batch_targets.size()[0])
+                val_loss += loss.item()
 
+                val_output.extend(predictions.detach().cpu().numpy())
                 val_targets.extend(batch_targets.detach().cpu().numpy())
                 predictions_errors.extend(batch_targets.detach().cpu().numpy()-predictions.detach().cpu(
                 ).numpy())
 
-    # Plot figures every 10 epochs
-    if epoch % 10 == 9:
-        train_epoch_loss = train_loss/train_size
+    # Plot figures 
+    if True:  # epoch % 10 == 9:
+        train_epoch_loss = train_loss/(epoch+1)
         train_loss_over_epoches.append(train_epoch_loss)
 
-        val_epoch_loss = val_loss/val_size
+        val_epoch_loss = val_loss/(epoch+1)
         val_loss_over_epoches.append(val_epoch_loss)
 
         ax0.clear()
@@ -211,6 +187,12 @@ for epoch in range(n_epochs):
                 title="Prediction Error")
         ax1.grid(True)
         ax1.plot(val_targets, predictions_errors, '.')
+
+        ax2.clear()
+        ax2.set(xlabel="Target", ylabel="Prediction",
+                title="Target-Prediction")
+        ax2.grid(True)
+        ax2.plot(val_targets, val_output, '.')
 
         plt.show(block=False)
         plt.draw()
