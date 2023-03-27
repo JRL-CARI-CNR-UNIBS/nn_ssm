@@ -8,14 +8,15 @@ Tr: 0.15
 min_distance: 0.2
 v_h: 1.6
 
-n_divisions: 10
+n_divisions: 9 #10
 n_objects: 1
 min_range: [-3,-3,0]
 max_range: [ 3, 3,3]
 
-n_iter: 10000
+n_iter: 10 #10000
 n_test_per_obs: 10
 scale_input: true
 only_one_conf_per_conn: false
+database_name: "test_dataset" #"test_dataset" "ssm_dataset" 
 
 # number of samples = n_iter*n_tests_per_obs*(n_divisions+1)

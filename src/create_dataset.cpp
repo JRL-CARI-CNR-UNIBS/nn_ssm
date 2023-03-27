@@ -39,6 +39,8 @@ struct Sample
 {
   Eigen::VectorXd q;
   Eigen::VectorXd dq;
+  double speed;
+  double distance;
   std::vector<std::vector<double>> obstacles;
 
   double scaling;
@@ -78,6 +80,9 @@ int main(int argc, char **argv)
 
   std::string tool_frame;
   nh.getParam("tool_frame",tool_frame);
+
+  std::string database_name;
+  nh.getParam("database_name",database_name);
 
   int n_divisions;
   nh.getParam("n_divisions",n_divisions);
@@ -217,7 +222,21 @@ int main(int argc, char **argv)
         sample.q = q_scaled;
         sample.dq = dq_scaled;
         sample.obstacles = obstacles;
-        sample.scaling = ssm->computeScalingFactorAtQ(q,dq); //q and dq, not q_scaled and dq_scaled!
+        sample.scaling  = ssm->computeScalingFactorAtQ(q,dq,sample.speed,sample.distance); //q and dq, not q_scaled and dq_scaled!
+
+        assert([&]() ->bool{
+                 if(sample.speed<=0 && sample.scaling!=1.0)
+                 {
+                   ROS_RED_STREAM("speed not ok! -> distance "<<sample.distance<<" speed "<< sample.speed<< " scaling "<<sample.scaling);
+                   return false;
+                 }
+                 if(sample.distance<=min_distance && sample.speed>0.0 && sample.scaling!=std::numeric_limits<double>::infinity())
+                 {
+                   ROS_RED_STREAM("distance not ok! -> distance "<<sample.distance<<" speed "<< sample.speed<< " scaling "<<sample.scaling);
+                   return false;
+                 }
+                 return true;
+               }());
 
         samples.push_back(sample);
 
@@ -300,7 +319,7 @@ int main(int argc, char **argv)
   path = path+"/scripts/data/";
 
   std::ofstream file_params;
-  file_params.open(path+"ssm_dataset_creation_params.bin", std::ios::out | std::ios::binary);
+  file_params.open(path+database_name+"_creation_params.bin", std::ios::out | std::ios::binary);
 
   const size_t bufsize = 1024 * 1024;
   std::unique_ptr<char[]> buf_params;
@@ -329,7 +348,7 @@ int main(int argc, char **argv)
 
   // Save samples in a database
   std::ofstream file;
-  file.open(path+"ssm_dataset.bin", std::ios::out | std::ios::binary);
+  file.open(path+database_name+".bin", std::ios::out | std::ios::binary);
   std::unique_ptr<char[]> buf;
   buf.reset(new char[bufsize]);
 
@@ -340,6 +359,12 @@ int main(int argc, char **argv)
   for(const Sample& sample:samples)
   {
     sample_vector.clear();
+
+    //speed
+    sample_vector.push_back(sample.speed);
+
+    //distance
+    sample_vector.push_back(sample.distance);
 
     //q
     tmp.clear();
@@ -360,11 +385,11 @@ int main(int argc, char **argv)
     // scaling
     sample_vector.push_back(sample.scaling);
 
-//    std::string txt = "obs: ";
-//    for(const std::vector<double>& obs:sample.obstacles)
-//      txt = txt+"("+std::to_string(obs[0])+","+std::to_string(obs[1])+","+std::to_string(obs[2])+") ";
+    //    std::string txt = "obs: ";
+    //    for(const std::vector<double>& obs:sample.obstacles)
+    //      txt = txt+"("+std::to_string(obs[0])+","+std::to_string(obs[1])+","+std::to_string(obs[2])+") ";
 
-//    ROS_INFO_STREAM("q: "<<sample.q.transpose()<<" | dq: "<<sample.dq.transpose()<<" | "<<txt+"| scaling: "<<sample.scaling);
+    //    ROS_INFO_STREAM("q: "<<sample.q.transpose()<<" | dq: "<<sample.dq.transpose()<<" | "<<txt+"| scaling: "<<sample.scaling);
 
     file.write((char*)&sample_vector[0], sample_vector.size()*sizeof(double));
   }
