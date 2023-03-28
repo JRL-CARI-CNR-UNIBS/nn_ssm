@@ -15,9 +15,9 @@ dataset_name = "test_dataset.bin"
 n_epochs = 5000
 loss_fcn = ""
 
-n_inputs = 500
-batch_size = 500
-lr = 0.001 #0.001
+n_inputs = 1000
+batch_size = 128
+lr = 0.001  # 0.001
 
 # Get paths
 PATH = os.path.dirname(os.path.abspath(__file__)) + "/data/"
@@ -28,6 +28,9 @@ fig_path = PATH + fig_name
 # Get cpu or gpu device for training
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Using {device} device")
+
+if device == "cuda":
+    print(f"=> {torch.cuda.get_device_name(0)}")
 
 # Load dataset
 raw_data = np.fromfile(dataset_path, dtype='float')
@@ -94,8 +97,8 @@ else:
     criterion = torch.nn.MSELoss()
 
 optimizer = optim.Adam(NN.parameters(), lr=lr, amsgrad=True)
-#optimizer = optim.SGD(NN.parameters(), lr=lr, momentum=0.9)
-#optimizer = optim.Adadelta(NN.parameters(), lr = lr)
+# optimizer = optim.SGD(NN.parameters(), lr=lr, momentum=0.9)
+# optimizer = optim.Adadelta(NN.parameters(), lr = lr)
 
 # Train & Validation
 
@@ -160,13 +163,13 @@ for epoch in range(n_epochs):
               (epoch + 1, loss.item(), max_error))
 
     # Plot figures
-    if True: 
+    if True:
 
         if epoch % 500 == 499:
             train_loss_over_epoches = []
 
         train_loss_over_epoches.append(
-        train_loss_per_epoch/len(train_dataloader))
+            train_loss_per_epoch/len(train_dataloader))
 
         ax0.clear()
         ax0.set(xlabel="Epoches", ylabel="Loss",
@@ -189,3 +192,5 @@ for epoch in range(n_epochs):
         plt.show(block=False)
         plt.draw()
         plt.pause(0.0001)
+        plt.savefig(fig_path, dpi=300)
+

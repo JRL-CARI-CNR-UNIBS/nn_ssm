@@ -5,7 +5,7 @@ add_compile_options(-std=c++17)
 set(CMAKE_BUILD_TYPE Debug)
 
 find_package(catkin REQUIRED COMPONENTS
-  length_penalty_metrics
+  ssm15066_estimators
   roscpp
   rospy
 )
@@ -13,7 +13,7 @@ find_package(catkin REQUIRED COMPONENTS
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES nn_ssm
-  CATKIN_DEPENDS length_penalty_metrics roscpp rospy
+  CATKIN_DEPENDS ssm15066_estimators roscpp rospy
   DEPENDS 
 )
 

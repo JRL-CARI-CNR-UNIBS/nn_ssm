@@ -11,12 +11,16 @@ load_net = False
 max_scaling = 1000
 fig_name = str(dof)+"dof.png"
 nn_name = "nn_ssm.pt"
-dataset_name = "ssm_dataset.bin"
-batch_size = 64
+dataset_name = "short_dataset.bin"
+batch_size = 100
 n_epochs = 5000
 perc_train = 0.8
 loss_fcn = ""
 lr = 0.001
+
+freq_batch = 10
+freq_epoch = 10
+freq_clear_plot = 500
 
 # Get paths
 PATH = os.path.dirname(os.path.abspath(__file__)) + "/data/"
@@ -159,9 +163,9 @@ for epoch in range(n_epochs):
             train_loss_per_epoch += (loss.item()*batch_targets.size()[0])
 
         batches_loss += loss.item()
-        if i % 1000 == 999:    # print every 1000 mini-batches
-            print('[%d, %5d] train batch loss: %.3f' %
-                  (epoch + 1, i + 1, batches_loss/1000))
+        if i % freq_batch == freq_batch-1:    # print every freq_batch mini-batches
+            print('[%d, %5d] train batch loss: %.8f' %
+                  (epoch + 1, i + 1, batches_loss/freq_batch))
             batches_loss = 0.0
 
         if epoch % 10 == 9:
@@ -179,7 +183,7 @@ for epoch in range(n_epochs):
         #         print(
         #             f"vel {sp}, distance {di}, predicted {pr}, target {tr}")
 
-    if epoch % 10 == 9:  # Validation every 10 epochs
+    if epoch % freq_epoch == freq_epoch-1:  # Validation every freq_epoch epochs
         # Validation phase
         print("----- VALIDATION -----")
 
@@ -208,9 +212,9 @@ for epoch in range(n_epochs):
                     val_loss_per_epoch += (loss.item()*batch_targets.size()[0])
 
                 batches_loss += loss.item()
-                if i % 1000 == 999:    # print every 1000 mini-batches
-                    print('[%d, %5d] val batch loss: %.3f' %
-                          (epoch + 1, i + 1, batches_loss/100))
+                if i % freq_batch == freq_batch-1:    # print every 1000 mini-batches
+                    print('[%d, %5d] val batch loss: %.8f' %
+                          (epoch + 1, i + 1, batches_loss/freq_batch))
                     batches_loss = 0.0
 
                 val_output.extend(predictions.detach().cpu().numpy())
@@ -220,12 +224,12 @@ for epoch in range(n_epochs):
     #print("-----------------------------------------------------------")
     # print(f"max err {max(train_predictions_errors)}")
 
-    if epoch % 500 == 499: # reset
+    if epoch % freq_clear_plot == freq_clear_plot-1: # reset
         train_loss_over_epoches = []
         val_loss_over_epoches = []
 
     # Plot figures
-    if epoch % 10 == 9:
+    if epoch % freq_epoch == freq_epoch-1:
         train_loss_over_epoches.append(
             train_loss_per_epoch/len(train_dataloader))
         val_loss_over_epoches.append(val_loss_per_epoch/len(val_dataloader))

@@ -8,15 +8,15 @@
   <license>TODO</license>
 
   <buildtool_depend>catkin</buildtool_depend>
-  <build_depend>length_penalty_metrics</build_depend>
   <build_depend>roscpp</build_depend>
   <build_depend>rospy</build_depend>
-  <build_export_depend>length_penalty_metrics</build_export_depend>
+  <build_depend>ssm15066_estimators</build_depend>
+  <build_export_depend>ssm15066_estimators</build_export_depend>
   <build_export_depend>roscpp</build_export_depend>
   <build_export_depend>rospy</build_export_depend>
-  <exec_depend>length_penalty_metrics</exec_depend>
   <exec_depend>roscpp</exec_depend>
   <exec_depend>rospy</exec_depend>
+  <exec_depend>ssm15066_estimators</exec_depend>
 
   <export>
     <!-- Other tools can request additional information be placed here -->
