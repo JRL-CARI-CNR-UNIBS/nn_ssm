@@ -13,7 +13,7 @@ n_objects: 1
 min_range: [-3,-3,0]
 max_range: [ 3, 3,3]
 
-n_iter: 100
+n_iter: 1000
 n_test_per_obs: 10
 scale_input: true
 database_name: "ssm_dataset_10k" #"short_dataset" #"test_dataset" "ssm_dataset" 

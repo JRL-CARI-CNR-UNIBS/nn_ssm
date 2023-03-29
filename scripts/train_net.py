@@ -130,7 +130,7 @@ for epoch in range(n_epochs):
     # Training phase
     print("----- TRAINING -----")
 
-    NN.train()  # set training mode
+    NN = NN.train()  # set training mode
 
     train_loss_per_epoch = 0.0
     val_loss_per_epoch = 0.0
@@ -192,7 +192,7 @@ for epoch in range(n_epochs):
         print("----- VALIDATION -----")
 
         with torch.no_grad():  # evaluation does not need gradients computation
-            NN.eval()  # set evaluation mode
+            NN = NN.eval()  # set evaluation mode
 
             val_targets = []
             val_output = []
@@ -276,4 +276,5 @@ for epoch in range(n_epochs):
         plt.savefig(fig_path, dpi=300)
 
     # Save NN at each epoch
+    NN = NN.eval()
     torch.save(NN, nn_path)
