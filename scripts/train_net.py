@@ -32,6 +32,9 @@ fig_path = PATH + fig_name
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Using {device} device")
 
+if device == "cuda":
+    print(f"=> {torch.cuda.get_device_name(0)}")
+
 # Load dataset
 raw_data = np.fromfile(dataset_path, dtype='float')
 length = raw_data.size

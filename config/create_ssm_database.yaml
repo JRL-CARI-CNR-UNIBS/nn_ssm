@@ -13,9 +13,9 @@ n_objects: 1
 min_range: [-3,-3,0]
 max_range: [ 3, 3,3]
 
-n_iter: 5000
+n_iter: 100
 n_test_per_obs: 10
 scale_input: true
-database_name: "ssm_dataset" #"short_dataset" #"test_dataset" "ssm_dataset" 
+database_name: "ssm_dataset_10k" #"short_dataset" #"test_dataset" "ssm_dataset" 
 
 # number of samples = n_iter*n_tests_per_obs*(n_divisions+1)
