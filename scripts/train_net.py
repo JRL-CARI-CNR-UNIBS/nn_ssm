@@ -11,8 +11,8 @@ load_net = False
 max_scaling = 1000
 fig_name = str(dof)+"dof.png"
 nn_name = "nn_ssm.pt"
-dataset_name = "short_dataset.bin"
-batch_size = 100
+dataset_name = "ssm_dataset.bin"
+batch_size = 128
 n_epochs = 5000
 perc_train = 0.8
 loss_fcn = ""
@@ -83,12 +83,13 @@ else:
     NN = nn.Sequential(
         nn.Linear(dof+dof+3, 1000),
         nn.Tanh(),
+        nn.Dropout(p=0.1),
         nn.Linear(1000, 1000),
         nn.Tanh(),
+        nn.Dropout(p=0.1),
         nn.Linear(1000, 100),
         nn.Tanh(),
-        nn.Linear(100, 100),
-        nn.Tanh(),
+        nn.Dropout(p=0.1),
         nn.Linear(100, 1),
         nn.Sigmoid()
     ).to(device)
@@ -175,7 +176,7 @@ for epoch in range(n_epochs):
             ).numpy())
 
         # for j in range(len(predictions)):
-        #     if (predictions[j] > 0.95 and batch_targets[j] <0.9):
+        #     if (epoch > 500 and abs(predictions[j] - batch_targets[j]) >0.1):
         #         pr = predictions[j].detach().cpu().numpy()
         #         tr = batch_targets[j].detach().cpu().numpy()
         #         sp = full_batch_input[j,0].detach().cpu().numpy()
@@ -221,7 +222,7 @@ for epoch in range(n_epochs):
                 val_targets.extend(batch_targets.detach().cpu().numpy())
                 val_predictions_errors.extend(batch_targets.detach().cpu().numpy()-predictions.detach().cpu(
                 ).numpy())
-    #print("-----------------------------------------------------------")
+    print("-----------------------------------------------------------")
     # print(f"max err {max(train_predictions_errors)}")
 
     if epoch % freq_clear_plot == freq_clear_plot-1: # reset

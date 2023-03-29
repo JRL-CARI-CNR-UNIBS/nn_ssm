@@ -15,8 +15,9 @@ dataset_name = "test_dataset.bin"
 n_epochs = 5000
 loss_fcn = ""
 
-n_inputs = 1000
-batch_size = 128
+k_loss = 10
+n_inputs = 9900
+batch_size = 100
 lr = 0.001  # 0.001
 
 # Get paths
@@ -81,8 +82,6 @@ else:
         nn.Tanh(),
         nn.Linear(1000, 100),
         nn.Tanh(),
-        nn.Linear(100, 100),
-        nn.Tanh(),
         nn.Linear(100, 1),
         nn.Sigmoid()
     ).to(device)
@@ -141,7 +140,7 @@ for epoch in range(n_epochs):
         predictions = NN(batch_input)
 
         # backpropagation
-        loss = criterion(predictions, batch_targets)
+        loss = criterion(k_loss*predictions, k_loss*batch_targets)
         loss.backward()
 
         optimizer.step()
@@ -157,10 +156,21 @@ for epoch in range(n_epochs):
         train_predictions_errors.extend(batch_targets.detach().cpu().numpy()-predictions.detach().cpu(
         ).numpy())
 
-        max_error = max(abs(batch_targets.detach().cpu().numpy() -
-                        predictions.detach().cpu().numpy()))
-        print('[%d,] batch loss: %.6f max error: %.6f' %
-              (epoch + 1, loss.item(), max_error))
+        # max_error = max(abs(batch_targets.detach().cpu().numpy() -
+        #                 predictions.detach().cpu().numpy()))
+        # print('[%d,] batch loss: %.6f max error: %.6f' %
+        #       (epoch + 1, loss.item(), max_error))
+        
+        for j in range(len(predictions)):
+            if (epoch > 200 and abs(predictions[j] - batch_targets[j]) >0.1):
+                pr = predictions[j].detach().cpu().numpy()
+                tr = batch_targets[j].detach().cpu().numpy()
+                sp = full_batch_input[j,0].detach().cpu().numpy()
+                di = full_batch_input[j,1].detach().cpu().numpy()
+                print(
+                    f"vel {sp}, distance {di}, predicted {pr}, target {tr}")
+
+    print("------------------------------------")
 
     # Plot figures
     if True:
@@ -175,7 +185,7 @@ for epoch in range(n_epochs):
         ax0.set(xlabel="Epoches", ylabel="Loss",
                 title="Training Loss")
         ax0.grid(True)
-        ax0.plot(train_loss_over_epoches)
+        ax0.plot(train_loss_over_epoches, color='orange')
 
         ax1.clear()
         ax1.set(xlabel="Target", ylabel="Error",

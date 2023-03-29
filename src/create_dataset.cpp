@@ -46,6 +46,20 @@ struct Sample
   double scaling;
 };
 
+void random_replace(std::vector<Sample>& v, const Sample& sample)
+{
+  std::random_device rd;
+  std::mt19937 gen(rd());
+  std::uniform_real_distribution<double> p(0.0, 1.0);
+  if(p(gen)>=0.5)
+  {
+    std::uniform_int_distribution<size_t> dis(0, std::distance(v.begin(), v.end()) - 1);
+    size_t idx = dis(gen);
+    assert(idx<v.size() && idx>=0);
+    v[idx] = sample;
+  }
+}
+
 int main(int argc, char **argv)
 {
   ros::init(argc, argv, "create_ssm_database");
@@ -57,9 +71,6 @@ int main(int argc, char **argv)
   std::srand(std::time(NULL));
 
   // Get params
-  bool only_one_conf_per_conn;
-  nh.getParam("only_one_conf_per_conn",only_one_conf_per_conn);
-
   bool scale_input;
   nh.getParam("scale_input",scale_input);
 
@@ -158,14 +169,15 @@ int main(int argc, char **argv)
   Eigen::Vector3d obs_location;
   Eigen::VectorXd parent, child, connection, dq, delta_q, q, q_scaled, dq_scaled;
 
-  std::vector<Sample> samples;
+  std::vector<Sample> samples, v_speed_neg, v_min_dist, v_safe_zero, v_scaling_1, v_scaling_01, v_scaling_02, v_scaling_03, v_scaling_04,
+      v_scaling_05, v_scaling_06, v_scaling_07, v_scaling_08, v_scaling_09,v_scaling_099;
   std::vector<double> obs;
   std::vector<std::vector<double>> obstacles;
 
-  bool progress_bar_full = false;
-  unsigned int progress = 0;
+  std::vector<int> vectors_fill(14,0);
+  size_t n_samples_per_vector = (size_t)std::ceil((n_iter*n_test_per_obs*(n_divisions+1)))/14;
 
-  for(unsigned int i=0; i<n_iter; i++)
+  while(true && ros::ok())
   {
     // Create obstacle locations
     obstacles.clear();
@@ -225,23 +237,22 @@ int main(int argc, char **argv)
         sample.scaling  = ssm->computeScalingFactorAtQ(q,dq,sample.speed,sample.distance); //q and dq, not q_scaled and dq_scaled!
 
         assert([&]() ->bool{
+
                  if(sample.speed<=0 && sample.scaling!=1.0)
                  {
                    ROS_RED_STREAM("speed not ok! -> distance "<<sample.distance<<" speed "<< sample.speed<< " scaling "<<sample.scaling);
                    return false;
                  }
+
                  if(sample.distance<=min_distance && sample.speed>0.0 && sample.scaling!=std::numeric_limits<double>::infinity())
                  {
                    ROS_RED_STREAM("distance not ok! -> distance "<<sample.distance<<" speed "<< sample.speed<< " scaling "<<sample.scaling);
                    return false;
                  }
-                 return true;
-               }());
 
-        samples.push_back(sample);
+                 if(sample.scaling<1.0)
+                 return false;
 
-        assert(sample.scaling>=1.0);
-        assert([&]() ->bool{
                  if(scale_input)
                  {
                    for(unsigned int l=0;l<q_scaled.size();l++)
@@ -271,48 +282,279 @@ int main(int argc, char **argv)
                      }
                    }
                  }
+
                  return true;
                }());
 
-        if(only_one_conf_per_conn)
-          break;
+        // Create a balanced dataset
+        if(sample.speed<=0.0)  //robot going away
+        {
+          assert(sample.scaling == 1.0);
+
+          if(v_speed_neg.size()<n_samples_per_vector)
+            v_speed_neg.push_back(sample);
+          else
+            random_replace(v_speed_neg,sample);
+        }
+        else if(sample.distance <= min_distance) //robot go towards the human and distance < min distance
+        {
+          assert(sample.scaling == std::numeric_limits<double>::infinity());
+
+          if(v_min_dist.size()<n_samples_per_vector)
+            v_min_dist.push_back(sample);
+          else
+            random_replace(v_min_dist,sample);
+        }
+        else if (sample.scaling == std::numeric_limits<double>::infinity()) //v_safe 0
+        {
+          assert(sample.speed>0.0 && sample.distance>min_distance);
+
+          if(v_safe_zero.size()<n_samples_per_vector)
+            v_safe_zero.push_back(sample);
+          else
+            random_replace(v_safe_zero,sample);
+        }
+
+        // Robot towards the human but enough distance between them
+        //List of cases spanning from 1/scaling = 0.0 t0 1/scaling = 1.0
+        else if(sample.scaling == 1.0)
+        {
+          assert(sample.speed>0.0 && sample.distance>min_distance);
+
+          if(v_scaling_1.size()<n_samples_per_vector)
+            v_scaling_1.push_back(sample);
+          else
+            random_replace(v_scaling_1,sample);
+        }
+        else if((1/sample.scaling)<1.0 && (1/sample.scaling)>=0.9)
+        {
+          assert(sample.speed>0.0 && sample.distance>min_distance);
+
+          if(v_scaling_099.size()<n_samples_per_vector)
+            v_scaling_099.push_back(sample);
+          else
+            random_replace(v_scaling_099,sample);
+        }
+        else if((1/sample.scaling)<0.9 && (1/sample.scaling)>=0.8)
+        {
+          assert(sample.speed>0.0 && sample.distance>min_distance);
+
+          if(v_scaling_09.size()<n_samples_per_vector)
+            v_scaling_09.push_back(sample);
+          else
+            random_replace(v_scaling_09,sample);
+        }
+        else if((1/sample.scaling)<0.8 && (1/sample.scaling)>=0.7)
+        {
+          assert(sample.speed>0.0 && sample.distance>min_distance);
+
+          if(v_scaling_08.size()<n_samples_per_vector)
+            v_scaling_08.push_back(sample);
+          else
+            random_replace(v_scaling_08,sample);
+        }
+        else if((1/sample.scaling)<0.7 && (1/sample.scaling)>=0.6)
+        {
+          assert(sample.speed>0.0 && sample.distance>min_distance);
+
+          if(v_scaling_07.size()<n_samples_per_vector)
+            v_scaling_07.push_back(sample);
+          else
+            random_replace(v_scaling_07,sample);
+        }
+        else if((1/sample.scaling)<0.6 && (1/sample.scaling)>=0.5)
+        {
+          assert(sample.speed>0.0 && sample.distance>min_distance);
+
+          if(v_scaling_06.size()<n_samples_per_vector)
+            v_scaling_06.push_back(sample);
+          else
+            random_replace(v_scaling_06,sample);
+        }
+        else if((1/sample.scaling)<0.5 && (1/sample.scaling)>=0.4)
+        {
+          assert(sample.speed>0.0 && sample.distance>min_distance);
+
+          if(v_scaling_05.size()<n_samples_per_vector)
+            v_scaling_05.push_back(sample);
+          else
+            random_replace(v_scaling_05,sample);
+        }
+        else if((1/sample.scaling)<0.4 && (1/sample.scaling)>=0.3)
+        {
+          assert(sample.speed>0.0 && sample.distance>min_distance);
+
+          if(v_scaling_04.size()<n_samples_per_vector)
+            v_scaling_04.push_back(sample);
+          else
+            random_replace(v_scaling_04,sample);
+        }
+        else if((1/sample.scaling)<0.3 && (1/sample.scaling)>=0.2)
+        {
+          assert(sample.speed>0.0 && sample.distance>min_distance);
+
+          if(v_scaling_03.size()<n_samples_per_vector)
+            v_scaling_03.push_back(sample);
+          else
+            random_replace(v_scaling_03,sample);
+        }
+        else if((1/sample.scaling)<0.2 && (1/sample.scaling)>=0.1)
+        {
+          assert(sample.speed>0.0 && sample.distance>min_distance);
+
+          if(v_scaling_02.size()<n_samples_per_vector)
+            v_scaling_02.push_back(sample);
+          else
+            random_replace(v_scaling_02,sample);
+        }
+        else
+        {
+          assert((1/sample.scaling)<0.1 && sample.speed>0.0 && sample.distance>min_distance);
+
+          if(v_scaling_01.size()<n_samples_per_vector)
+            v_scaling_01.push_back(sample);
+          else
+            random_replace(v_scaling_01,sample);
+        }
       }
 
       assert([&]() ->bool{
-               if(not only_one_conf_per_conn)
+               if((q-child).norm()>1e-04)
                {
-                 if((q-child).norm()>1e-04)
-                 {
-                   ROS_INFO_STREAM("q "<<q.transpose());
-                   ROS_INFO_STREAM("child "<<child.transpose());
-                   ROS_INFO_STREAM("err "<<(q-child).norm());
-                   return false;
-                 }
+                 ROS_INFO_STREAM("q "<<q.transpose());
+                 ROS_INFO_STREAM("child "<<child.transpose());
+                 ROS_INFO_STREAM("err "<<(q-child).norm());
+                 return false;
                }
                return true;
              }());
     }
 
-    progress = std::ceil(((double)(i+1.0))/((double)n_iter)*100.0);
-    if(progress%1 == 0 && not progress_bar_full)
+    vectors_fill[0] = std::ceil(((double) (n_samples_per_vector,v_speed_neg.size())/((double) n_samples_per_vector))*100.0);
+    vectors_fill[1] = std::ceil(((double) (n_samples_per_vector,v_min_dist.size())/((double) n_samples_per_vector))*100.0);
+    vectors_fill[2] = std::ceil(((double) (n_samples_per_vector,v_scaling_1.size())/((double) n_samples_per_vector))*100.0);
+    vectors_fill[3] = std::ceil(((double) (n_samples_per_vector,v_scaling_099.size())/((double) n_samples_per_vector))*100.0);
+    vectors_fill[4] = std::ceil(((double) (n_samples_per_vector,v_scaling_09.size())/((double) n_samples_per_vector))*100.0);
+    vectors_fill[5] = std::ceil(((double) (n_samples_per_vector,v_scaling_08.size())/((double) n_samples_per_vector))*100.0);
+    vectors_fill[6] = std::ceil(((double) (n_samples_per_vector,v_scaling_07.size())/((double) n_samples_per_vector))*100.0);
+    vectors_fill[7] = std::ceil(((double) (n_samples_per_vector,v_scaling_06.size())/((double) n_samples_per_vector))*100.0);
+    vectors_fill[8] = std::ceil(((double) (n_samples_per_vector,v_scaling_05.size())/((double) n_samples_per_vector))*100.0);
+    vectors_fill[9] = std::ceil(((double) (n_samples_per_vector,v_scaling_04.size())/((double) n_samples_per_vector))*100.0);
+    vectors_fill[10] = std::ceil(((double)(n_samples_per_vector,v_scaling_03.size())/((double) n_samples_per_vector))*100.0);
+    vectors_fill[11] = std::ceil(((double)(n_samples_per_vector,v_scaling_02.size())/((double) n_samples_per_vector))*100.0);
+    vectors_fill[12] = std::ceil(((double)(n_samples_per_vector,v_scaling_01.size())/((double) n_samples_per_vector))*100.0);
+    vectors_fill[13] = std::ceil(((double)(n_samples_per_vector,v_safe_zero.size())/((double) n_samples_per_vector))*100.0);
+
+    std::string output = "\r[=>";
+
+    for(size_t i=0; i<vectors_fill.size();i++)
+      output = output+" (v"+std::to_string(i)+" "+std::to_string(vectors_fill[i])+"%)";
+
+    output = "\033[1;37;44m"+output+" <=]\033[0m";  //1->bold, 37->foreground white, 44->background blue
+
+    if(v_speed_neg.size()>=n_samples_per_vector && v_min_dist.size()>=n_samples_per_vector &&
+       v_scaling_1.size()>=n_samples_per_vector && v_scaling_01.size()>=n_samples_per_vector &&
+       v_scaling_02.size()>=n_samples_per_vector && v_scaling_03.size()>=n_samples_per_vector &&
+       v_scaling_04.size()>=n_samples_per_vector && v_scaling_05.size()>=n_samples_per_vector &&
+       v_scaling_06.size()>=n_samples_per_vector && v_scaling_07.size()>=n_samples_per_vector &&
+       v_scaling_08.size()>=n_samples_per_vector && v_scaling_09.size()>=n_samples_per_vector &&
+       v_scaling_099.size()>=n_samples_per_vector && v_safe_zero.size()>=n_samples_per_vector)
     {
-      std::string output = "\r[";
-
-      for(unsigned int j=0;j<progress/5.0;j++)
-        output = output+"=";
-
-      output = output+">] ";
-      output = "\033[1;41;42m"+output+std::to_string(progress)+"%\033[0m";  //1->bold, 37->foreground white, 42->background green
-
-      if(progress == 100)
-      {
-        progress_bar_full = true;
-        output = output+"\033[1;5;32m Succesfully completed!\033[0m\n";
-      }
-
+      output = output+"\033[1;5;32m Succesfully completed!\033[0m\n";
       std::cout<<output;
+
+      break;
     }
+    else
+      std::cout<<output;
   }
+
+  // Shuffle the vectors and extract the first n_samples_per_vector elements
+  std::default_random_engine rng = std::default_random_engine { rd() };
+  std::shuffle(std::begin(v_speed_neg), std::end(v_speed_neg), rng);
+  std::shuffle(std::begin(v_min_dist), std::end(v_min_dist), rng);
+  std::shuffle(std::begin(v_scaling_1), std::end(v_scaling_1), rng);
+  std::shuffle(std::begin(v_scaling_01), std::end(v_scaling_01), rng);
+  std::shuffle(std::begin(v_scaling_02), std::end(v_scaling_02), rng);
+  std::shuffle(std::begin(v_scaling_03), std::end(v_scaling_03), rng);
+  std::shuffle(std::begin(v_scaling_04), std::end(v_scaling_04), rng);
+  std::shuffle(std::begin(v_scaling_05), std::end(v_scaling_05), rng);
+  std::shuffle(std::begin(v_scaling_06), std::end(v_scaling_06), rng);
+  std::shuffle(std::begin(v_scaling_07), std::end(v_scaling_07), rng);
+  std::shuffle(std::begin(v_scaling_08), std::end(v_scaling_08), rng);
+  std::shuffle(std::begin(v_scaling_09), std::end(v_scaling_09), rng);
+  std::shuffle(std::begin(v_scaling_099), std::end(v_scaling_099), rng);
+  std::shuffle(std::begin(v_safe_zero), std::end(v_safe_zero), rng);
+
+  std::vector<Sample>::const_iterator first = v_speed_neg.begin();
+  std::vector<Sample>::const_iterator last = v_speed_neg.begin() + n_samples_per_vector;
+  std::vector<Sample> tmp_speed_vec(first, last);
+  samples.insert(samples.end(),tmp_speed_vec.begin(),tmp_speed_vec.end());
+
+  first = v_min_dist.begin();
+  last = v_min_dist.begin() + n_samples_per_vector;
+  std::vector<Sample> tmp_dist_vec(first, last);
+  samples.insert(samples.end(),tmp_dist_vec.begin(),tmp_dist_vec.end());
+
+  first = v_scaling_1.begin();
+  last = v_scaling_1.begin() + n_samples_per_vector;
+  std::vector<Sample> tmp_scaling_1_vec(first, last);
+  samples.insert(samples.end(),tmp_scaling_1_vec.begin(),tmp_scaling_1_vec.end());
+
+  first = v_scaling_01.begin();
+  last = v_scaling_01.begin() + n_samples_per_vector;
+  std::vector<Sample> tmp_scaling_01_vec(first, last);
+  samples.insert(samples.end(),tmp_scaling_01_vec.begin(),tmp_scaling_01_vec.end());
+
+  first = v_scaling_02.begin();
+  last = v_scaling_02.begin() + n_samples_per_vector;
+  std::vector<Sample> tmp_scaling_02_vec(first, last);
+  samples.insert(samples.end(),tmp_scaling_02_vec.begin(),tmp_scaling_02_vec.end());
+
+  first = v_scaling_03.begin();
+  last = v_scaling_03.begin() + n_samples_per_vector;
+  std::vector<Sample> tmp_scaling_03_vec(first, last);
+  samples.insert(samples.end(),tmp_scaling_03_vec.begin(),tmp_scaling_03_vec.end());
+
+  first = v_scaling_04.begin();
+  last = v_scaling_04.begin() + n_samples_per_vector;
+  std::vector<Sample> tmp_scaling_04_vec(first, last);
+  samples.insert(samples.end(),tmp_scaling_04_vec.begin(),tmp_scaling_04_vec.end());
+
+  first = v_scaling_05.begin();
+  last = v_scaling_05.begin() + n_samples_per_vector;
+  std::vector<Sample> tmp_scaling_05_vec(first, last);
+  samples.insert(samples.end(),tmp_scaling_05_vec.begin(),tmp_scaling_05_vec.end());
+
+  first = v_scaling_06.begin();
+  last = v_scaling_06.begin() + n_samples_per_vector;
+  std::vector<Sample> tmp_scaling_06_vec(first, last);
+  samples.insert(samples.end(),tmp_scaling_06_vec.begin(),tmp_scaling_06_vec.end());
+
+  first = v_scaling_07.begin();
+  last = v_scaling_07.begin() + n_samples_per_vector;
+  std::vector<Sample> tmp_scaling_07_vec(first, last);
+  samples.insert(samples.end(),tmp_scaling_07_vec.begin(),tmp_scaling_07_vec.end());
+
+  first = v_scaling_08.begin();
+  last = v_scaling_08.begin() + n_samples_per_vector;
+  std::vector<Sample> tmp_scaling_08_vec(first, last);
+  samples.insert(samples.end(),tmp_scaling_08_vec.begin(),tmp_scaling_08_vec.end());
+
+  first = v_scaling_09.begin();
+  last = v_scaling_09.begin() + n_samples_per_vector;
+  std::vector<Sample> tmp_scaling_09_vec(first, last);
+  samples.insert(samples.end(),tmp_scaling_09_vec.begin(),tmp_scaling_09_vec.end());
+
+  first = v_scaling_099.begin();
+  last = v_scaling_099.begin() + n_samples_per_vector;
+  std::vector<Sample> tmp_scaling_099_vec(first, last);
+  samples.insert(samples.end(),tmp_scaling_099_vec.begin(),tmp_scaling_099_vec.end());
+
+  first = v_safe_zero.begin();
+  last = v_safe_zero.begin() + n_samples_per_vector;
+  std::vector<Sample> tmp_safe_zero(first, last);
+  samples.insert(samples.end(),tmp_safe_zero.begin(),tmp_safe_zero.end());
 
   // Save params in a database
   std::string path = ros::package::getPath("nn_ssm");
@@ -356,6 +598,7 @@ int main(int argc, char **argv)
 
   std::vector<double> tmp;
   std::vector<double> sample_vector;
+
   for(const Sample& sample:samples)
   {
     sample_vector.clear();
@@ -397,7 +640,7 @@ int main(int argc, char **argv)
   file.flush();
   file.close();
 
-  ROS_INFO_STREAM("Total number of samples -> "<<samples.size());
+  ROS_INFO_STREAM("Dataset size -> "<<samples.size());
 
   return 0;
 }
