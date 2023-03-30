@@ -7,12 +7,11 @@ import matplotlib.pyplot as plt
 
 # Params
 dof = 6
-load_net = False
-max_scaling = 1000
+load_net = True
+max_scaling = 100
 fig_name = str(dof)+"dof.png"
 nn_name = "nn_ssm.pt"
-dataset_name = "ssm_dataset.bin"
-batch_size = 128
+dataset_name = "ssm_dataset_100k.bin"
 n_epochs = 5000
 perc_train = 0.8
 loss_fcn = ""
@@ -20,7 +19,24 @@ lr = 0.001
 
 freq_batch = 10
 freq_epoch = 10
-freq_clear_plot = 500
+freq_clear_plot = 200
+
+# Batch size
+if dataset_name == "ssm_dataset_1k.bin":
+    batch_size = 64
+elif dataset_name == "ssm_dataset_10k.bin":
+    batch_size = 128
+elif dataset_name == "ssm_dataset_50k.bin":
+    batch_size = 264
+elif dataset_name == "ssm_dataset_75k.bin":
+    batch_size = 264
+elif dataset_name == "ssm_dataset_100k.bin":
+    batch_size = 328
+elif dataset_name == "ssm_dataset_150k.bin":
+    batch_size = 328
+else:
+    batch_size = 656
+
 
 # Get paths
 PATH = os.path.dirname(os.path.abspath(__file__)) + "/data/"
@@ -86,13 +102,13 @@ else:
     NN = nn.Sequential(
         nn.Linear(dof+dof+3, 1000),
         nn.Tanh(),
-        nn.Dropout(p=0.1),
+        # nn.Dropout(p=0.1),
         nn.Linear(1000, 1000),
         nn.Tanh(),
-        nn.Dropout(p=0.1),
+        # nn.Dropout(p=0.1),
         nn.Linear(1000, 100),
         nn.Tanh(),
-        nn.Dropout(p=0.1),
+        # nn.Dropout(p=0.1),
         nn.Linear(100, 1),
         nn.Sigmoid()
     ).to(device)

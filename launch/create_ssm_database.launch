@@ -11,8 +11,8 @@
   <node pkg="nn_ssm"
         name="create_dataset"
         type="create_dataset"
-        output="screen"
-        launch-prefix="gdb -ex run --args">
+        output="screen">
+        <!-- launch-prefix="gdb -ex run -X-args"> -->
  </node>
 
 </launch>

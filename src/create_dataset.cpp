@@ -169,8 +169,8 @@ int main(int argc, char **argv)
   Eigen::Vector3d obs_location;
   Eigen::VectorXd parent, child, connection, dq, delta_q, q, q_scaled, dq_scaled;
 
-  std::vector<Sample> samples, v_speed_neg, v_min_dist, v_safe_zero, v_scaling_1, v_scaling_01, v_scaling_02, v_scaling_03, v_scaling_04,
-      v_scaling_05, v_scaling_06, v_scaling_07, v_scaling_08, v_scaling_09,v_scaling_099;
+  std::vector<Sample> samples, v_speed_neg, v_min_dist, v_safe_zero, v_scaling_1, v_scaling_01, v_scaling_02,
+      v_scaling_03, v_scaling_04, v_scaling_05, v_scaling_06, v_scaling_07, v_scaling_08, v_scaling_09,v_scaling_099;
   std::vector<double> obs;
   std::vector<std::vector<double>> obstacles;
 
@@ -430,16 +430,16 @@ int main(int argc, char **argv)
              }());
     }
 
-    vectors_fill[0] = std::ceil(((double) (n_samples_per_vector,v_speed_neg.size())/((double) n_samples_per_vector))*100.0);
-    vectors_fill[1] = std::ceil(((double) (n_samples_per_vector,v_min_dist.size())/((double) n_samples_per_vector))*100.0);
-    vectors_fill[2] = std::ceil(((double) (n_samples_per_vector,v_scaling_1.size())/((double) n_samples_per_vector))*100.0);
-    vectors_fill[3] = std::ceil(((double) (n_samples_per_vector,v_scaling_099.size())/((double) n_samples_per_vector))*100.0);
-    vectors_fill[4] = std::ceil(((double) (n_samples_per_vector,v_scaling_09.size())/((double) n_samples_per_vector))*100.0);
-    vectors_fill[5] = std::ceil(((double) (n_samples_per_vector,v_scaling_08.size())/((double) n_samples_per_vector))*100.0);
-    vectors_fill[6] = std::ceil(((double) (n_samples_per_vector,v_scaling_07.size())/((double) n_samples_per_vector))*100.0);
-    vectors_fill[7] = std::ceil(((double) (n_samples_per_vector,v_scaling_06.size())/((double) n_samples_per_vector))*100.0);
-    vectors_fill[8] = std::ceil(((double) (n_samples_per_vector,v_scaling_05.size())/((double) n_samples_per_vector))*100.0);
-    vectors_fill[9] = std::ceil(((double) (n_samples_per_vector,v_scaling_04.size())/((double) n_samples_per_vector))*100.0);
+    vectors_fill[0]  = std::ceil(((double) (n_samples_per_vector,v_speed_neg.size())/((double) n_samples_per_vector))*100.0);
+    vectors_fill[1]  = std::ceil(((double) (n_samples_per_vector,v_min_dist.size())/((double) n_samples_per_vector))*100.0);
+    vectors_fill[2]  = std::ceil(((double) (n_samples_per_vector,v_scaling_1.size())/((double) n_samples_per_vector))*100.0);
+    vectors_fill[3]  = std::ceil(((double) (n_samples_per_vector,v_scaling_099.size())/((double) n_samples_per_vector))*100.0);
+    vectors_fill[4]  = std::ceil(((double) (n_samples_per_vector,v_scaling_09.size())/((double) n_samples_per_vector))*100.0);
+    vectors_fill[5]  = std::ceil(((double) (n_samples_per_vector,v_scaling_08.size())/((double) n_samples_per_vector))*100.0);
+    vectors_fill[6]  = std::ceil(((double) (n_samples_per_vector,v_scaling_07.size())/((double) n_samples_per_vector))*100.0);
+    vectors_fill[7]  = std::ceil(((double) (n_samples_per_vector,v_scaling_06.size())/((double) n_samples_per_vector))*100.0);
+    vectors_fill[8]  = std::ceil(((double) (n_samples_per_vector,v_scaling_05.size())/((double) n_samples_per_vector))*100.0);
+    vectors_fill[9]  = std::ceil(((double) (n_samples_per_vector,v_scaling_04.size())/((double) n_samples_per_vector))*100.0);
     vectors_fill[10] = std::ceil(((double)(n_samples_per_vector,v_scaling_03.size())/((double) n_samples_per_vector))*100.0);
     vectors_fill[11] = std::ceil(((double)(n_samples_per_vector,v_scaling_02.size())/((double) n_samples_per_vector))*100.0);
     vectors_fill[12] = std::ceil(((double)(n_samples_per_vector,v_scaling_01.size())/((double) n_samples_per_vector))*100.0);
