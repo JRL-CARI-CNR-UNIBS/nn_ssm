@@ -12,8 +12,7 @@ max_scaling = 100
 fig_name = str(dof)+"dof.png"
 nn_name = "nn_ssm.pt"
 list_dataset_name = ["50k","75k","100k","150k","250k","500k"]
-# list_n_epochs = [1000,1000,1500,1500,3000,3000]
-list_n_epochs = [1,1,1,1,1,1]
+list_n_epochs = [1000,1000,1500,1500,3000,3000]
 
 perc_train = 0.8
 loss_fcn = ""
