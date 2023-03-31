@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 # Params
 dof = 6
 load_net = True
-max_scaling = 100
+max_scaling = 1000
 fig_name = str(dof)+"dof.png"
 nn_name = "nn_ssm.pt"
 list_dataset_name = ["50k","75k","100k","150k","250k","500k"]

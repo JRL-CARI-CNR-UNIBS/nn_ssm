@@ -8,10 +8,10 @@ import matplotlib.pyplot as plt
 # Params
 dof = 6
 load_net = True
-max_scaling = 100
+max_scaling = 1000
 fig_name = str(dof)+"dof.png"
 nn_name = "nn_ssm.pt"
-dataset_name = "ssm_dataset_100k.bin"
+dataset_name = "ssm_dataset_10k.bin"
 n_epochs = 5000
 perc_train = 0.8
 loss_fcn = ""
@@ -101,6 +101,9 @@ if load_net:
 else:
     NN = nn.Sequential(
         nn.Linear(dof+dof+3, 1000),
+        nn.Tanh(),
+        # nn.Dropout(p=0.1),
+        nn.Linear(1000, 1000),
         nn.Tanh(),
         # nn.Dropout(p=0.1),
         nn.Linear(1000, 1000),
