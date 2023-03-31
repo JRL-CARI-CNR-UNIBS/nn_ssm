@@ -12,7 +12,8 @@ max_scaling = 100
 fig_name = str(dof)+"dof.png"
 nn_name = "nn_ssm.pt"
 list_dataset_name = ["50k","75k","100k","150k","250k","500k"]
-list_n_epochs = [1000,1000,1500,1500,3000,3000]
+list_n_epochs = [3000,3000,3000,3000,3000,3000]
+list_batch_size = [128,128,264,264,328,328]
 
 perc_train = 0.8
 loss_fcn = ""
@@ -22,31 +23,17 @@ freq_batch = 10
 freq_epoch = 10
 freq_clear_plot = 200
 
+# Get paths
+PATH = os.path.dirname(os.path.abspath(__file__)) + "/data/"
+nn_path_shared = PATH + nn_name
+
 for d in range(len(list_dataset_name)):
   dataset_name = "ssm_dataset_"+list_dataset_name[d]+".bin"
   n_epochs = list_n_epochs[d]
-
-  # Batch size
-  if dataset_name == "ssm_dataset_1k.bin":
-      batch_size = 64
-  elif dataset_name == "ssm_dataset_10k.bin":
-      batch_size = 128
-  elif dataset_name == "ssm_dataset_50k.bin":
-      batch_size = 264
-  elif dataset_name == "ssm_dataset_75k.bin":
-      batch_size = 264
-  elif dataset_name == "ssm_dataset_100k.bin":
-      batch_size = 328
-  elif dataset_name == "ssm_dataset_150k.bin":
-      batch_size = 328
-  else:
-      batch_size = 656
-
+  batch_size = list_batch_size[d]
 
   # Get paths
-  PATH = os.path.dirname(os.path.abspath(__file__)) + "/data/"
   dataset_path = PATH + dataset_name
-  nn_path_shared = PATH + nn_name
   nn_path = PATH + list_dataset_name[d] + "_" + nn_name
   fig_path = PATH + list_dataset_name[d] + fig_name
 
@@ -68,15 +55,10 @@ for d in range(len(list_dataset_name)):
   # from array to multi-dimensional-array
   raw_data = raw_data.reshape(rows, cols)
 
-  # for t in range(rows):
-  #     if raw_data[t,0] <= 0.0 and raw_data[t,-1] != 1.0:
-  #         print(f"speed {raw_data[t,0]:.3f}, target {raw_data[t,-1]:.3f}")
-
   # Transform scalings values
   scalings = raw_data[:, -1]  # last column
   scalings = np.where(scalings > max_scaling, 0.0, (1.0 /
                       scalings))   # scaling between 0.0 and 1.0
-  # scalings = np.where(scalings > max_scaling, max_scaling, scalings)
 
   # Create training and validation datasets
 
@@ -190,8 +172,8 @@ for d in range(len(list_dataset_name)):
 
           batches_loss += loss.item()
           if i % freq_batch == freq_batch-1:    # print every freq_batch mini-batches
-              print('[%d, %5d] train batch loss: %.8f' %
-                    (epoch + 1, i + 1, batches_loss/freq_batch))
+              print('[%s -> %d, %5d] train batch loss: %.8f' %
+                    (list_dataset_name[d], epoch + 1, i + 1, batches_loss/freq_batch))
               batches_loss = 0.0
 
           if epoch % 10 == 9:
@@ -239,8 +221,8 @@ for d in range(len(list_dataset_name)):
 
                   batches_loss += loss.item()
                   if i % freq_batch == freq_batch-1:    # print every 1000 mini-batches
-                      print('[%d, %5d] val batch loss: %.8f' %
-                            (epoch + 1, i + 1, batches_loss/freq_batch))
+                      print('[%s -> %d, %5d] val batch loss: %.8f' %
+                            (list_dataset_name[d], epoch + 1, i + 1, batches_loss/freq_batch))
                       batches_loss = 0.0
 
                   val_output.extend(predictions.detach().cpu().numpy())
