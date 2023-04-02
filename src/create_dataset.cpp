@@ -148,6 +148,11 @@ int main(int argc, char **argv)
   Eigen::VectorXd inv_max_speed  = max_speed.cwiseInverse();
   Eigen::VectorXd inv_q_limits  = (ub-lb).cwiseInverse();
   Eigen::VectorXd inv_speed_limits  = (max_speed-min_speed).cwiseInverse();
+  double max_tang_speed = max_speed.norm();
+  double min_tang_speed = -max_tang_speed;
+
+  double max_distance = std::max(std::sqrt(std::pow(max_range[0],2)+std::pow(max_range[1],2)+std::pow(max_range[2],2)),
+      std::sqrt(std::pow(min_range[0],2)+std::pow(min_range[1],2)+std::pow(min_range[2],2)));
 
   ssm15066_estimator::SSM15066Estimator2DPtr ssm = std::make_shared<ssm15066_estimator::SSM15066Estimator2D>(chain,0.001);
   ssm->setMaxCartAcc(max_cart_acc,false);
@@ -285,6 +290,15 @@ int main(int argc, char **argv)
 
                  return true;
                }());
+
+        if(scale_input)
+        {
+          sample.speed = (sample.speed-min_tang_speed)/(max_tang_speed-min_tang_speed);
+          assert(sample.speed>=0 && sample.speed<=1);
+
+          sample.distance = sample.distance/max_distance;
+          assert(sample.distance>=0 && sample.distance<=1);
+        }
 
         // Create a balanced dataset
         if(sample.speed<=0.0)  //robot going away
@@ -603,12 +617,6 @@ int main(int argc, char **argv)
   {
     sample_vector.clear();
 
-    //speed
-    sample_vector.push_back(sample.speed);
-
-    //distance
-    sample_vector.push_back(sample.distance);
-
     //q
     tmp.clear();
     tmp.resize(sample.q.size());
@@ -624,6 +632,12 @@ int main(int argc, char **argv)
     //obstacles
     for(const std::vector<double>& obs:sample.obstacles)
       sample_vector.insert(sample_vector.end(),obs.begin(),obs.end());
+
+    //speed
+    sample_vector.push_back(sample.speed);
+
+    //distance
+    sample_vector.push_back(sample.distance);
 
     // scaling
     sample_vector.push_back(sample.scaling);

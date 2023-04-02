@@ -176,7 +176,7 @@ for d in range(len(list_dataset_name)):
                     (list_dataset_name[d], epoch + 1, i + 1, batches_loss/freq_batch))
               batches_loss = 0.0
 
-          if epoch % 10 == 9:
+          if epoch % freq_epoch == freq_epoch-1:
               train_output.extend(predictions.detach().cpu().numpy())
               train_targets.extend(batch_targets.detach().cpu().numpy())
               train_predictions_errors.extend(batch_targets.detach().cpu().numpy()-predictions.detach().cpu(
