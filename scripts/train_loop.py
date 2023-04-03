@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 
 # Params
 dof = 6
-load_net = True
+load_net = False
 max_scaling = 1000
 fig_name = str(dof)+"dof.png"
 nn_name = "nn_ssm.pt"
