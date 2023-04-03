@@ -35,3 +35,5 @@
 *kdev4*
 *.autosave
 *.bin
+
+libtorch/
