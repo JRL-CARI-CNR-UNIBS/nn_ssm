@@ -71,9 +71,6 @@ int main(int argc, char **argv)
   std::srand(std::time(NULL));
 
   // Get params
-  bool scale_input;
-  nh.getParam("scale_input",scale_input);
-
   int n_objects;
   nh.getParam("n_objects",n_objects);
 
@@ -175,7 +172,8 @@ int main(int argc, char **argv)
   Eigen::VectorXd parent, child, connection, dq, delta_q, q, q_scaled, dq_scaled;
 
   std::vector<Sample> samples, v_speed_neg, v_min_dist, v_safe_zero, v_scaling_1, v_scaling_01, v_scaling_02,
-      v_scaling_03, v_scaling_04, v_scaling_05, v_scaling_06, v_scaling_07, v_scaling_08, v_scaling_09,v_scaling_099;
+      v_scaling_03, v_scaling_04, v_scaling_05, v_scaling_06, v_scaling_07, v_scaling_08, v_scaling_09,v_scaling_099,
+      v_speed_0_02, v_speed_02_04, v_speed_04_06, v_speed_06_08, v_speed_08_1;
   std::vector<double> obs;
   std::vector<std::vector<double>> obstacles;
 
@@ -196,11 +194,7 @@ int main(int argc, char **argv)
 
       ssm->addObstaclePosition(obs_location);
 
-      if(scale_input)
-        obs = {x,y,z};
-      else
-        obs = {obs_location[0],obs_location[1],obs_location[2]};
-
+      obs = {x,y,z};
       obstacles.push_back(obs);
     }
 
@@ -223,17 +217,8 @@ int main(int argc, char **argv)
       {
         q = parent+t*delta_q;
 
-        // Scale input
-        if(scale_input)
-        {
-          q_scaled = (inv_q_limits).cwiseProduct(q-lb);
-          dq_scaled = (inv_speed_limits).cwiseProduct(dq-min_speed);
-        }
-        else
-        {
-          q_scaled = q;
-          dq_scaled = dq;
-        }
+        q_scaled = (inv_q_limits).cwiseProduct(q-lb);
+        dq_scaled = (inv_speed_limits).cwiseProduct(dq-min_speed);
 
         Sample sample;
         sample.q = q_scaled;
@@ -258,32 +243,29 @@ int main(int argc, char **argv)
                  if(sample.scaling<1.0)
                  return false;
 
-                 if(scale_input)
+                 for(unsigned int l=0;l<q_scaled.size();l++)
                  {
-                   for(unsigned int l=0;l<q_scaled.size();l++)
+                   if(q_scaled[l]>1.0 || q_scaled[l]<0.0)
                    {
-                     if(q_scaled[l]>1.0 || q_scaled[l]<0.0)
+                     return false;
+                   }
+                 }
+
+                 for(unsigned int l=0;l<dq_scaled.size();l++)
+                 {
+                   if(dq_scaled[l]>1.0 || dq_scaled[l]<0.0)
+                   {
+                     return false;
+                   }
+                 }
+
+                 for(const std::vector<double>& tmp_vector:obstacles)
+                 {
+                   for(const double& tmp:tmp_vector)
+                   {
+                     if(tmp>1.0 || tmp<0.0)
                      {
                        return false;
-                     }
-                   }
-
-                   for(unsigned int l=0;l<dq_scaled.size();l++)
-                   {
-                     if(dq_scaled[l]>1.0 || dq_scaled[l]<0.0)
-                     {
-                       return false;
-                     }
-                   }
-
-                   for(const std::vector<double>& tmp_vector:obstacles)
-                   {
-                     for(const double& tmp:tmp_vector)
-                     {
-                       if(tmp>1.0 || tmp<0.0)
-                       {
-                         return false;
-                       }
                      }
                    }
                  }
@@ -291,14 +273,11 @@ int main(int argc, char **argv)
                  return true;
                }());
 
-        if(scale_input)
-        {
-          sample.speed = (sample.speed-min_tang_speed)/(max_tang_speed-min_tang_speed);
-          assert(sample.speed>=0 && sample.speed<=1);
+        sample.speed = (sample.speed-min_tang_speed)/(max_tang_speed-min_tang_speed);
+        assert(sample.speed>=0 && sample.speed<=1);
 
-          sample.distance = sample.distance/max_distance;
-          assert(sample.distance>=0 && sample.distance<=1);
-        }
+        sample.distance = sample.distance/max_distance;
+        assert(sample.distance>=0 && sample.distance<=1);
 
         // Create a balanced dataset
         if(sample.speed<=0.0)  //robot going away
@@ -583,7 +562,6 @@ int main(int argc, char **argv)
 
   file_params.rdbuf()->pubsetbuf(buf_params.get(), bufsize); n_test_per_obs;
 
-  file_params.write((char*) &scale_input   , sizeof(scale_input                 ));
   file_params.write((char*) &group_name    , sizeof(group_name                  ));
   file_params.write((char*) &base_frame    , sizeof(base_frame                  ));
   file_params.write((char*) &tool_frame    , sizeof(tool_frame                  ));

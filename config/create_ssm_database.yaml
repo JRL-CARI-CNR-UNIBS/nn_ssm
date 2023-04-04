@@ -15,7 +15,6 @@ max_range: [ 1.5, 1.5,1.5]
 
 n_iter: 5000
 n_test_per_obs: 10
-scale_input: true
 database_name: "ssm_dataset_500k"
 
 # number of samples = n_iter*n_tests_per_obs*(n_divisions+1)

@@ -21,7 +21,7 @@ lr = 0.001
 
 freq_batch = 10
 freq_epoch = 10
-freq_clear_plot = 200
+freq_clear_plot = 4000
 
 # Get paths
 PATH = os.path.dirname(os.path.abspath(__file__)) + "/data/"
@@ -67,12 +67,8 @@ for d in range(len(list_dataset_name)):
   # q, dq, (x,y,z) of obstacle (first, second, last columns excluded)
   input = torch.Tensor(raw_data[:, 0:-3]).reshape(rows, cols-3)
   scalings_tensor = torch.Tensor(scalings).reshape(rows, 1)
-  print("speed tensor")
   speed_tensor = torch.Tensor(raw_data[:,-3]).reshape(rows, 1)
-  print(speed_tensor[0:10,:])
-  print("distance tensor")
   distance_tensor = torch.Tensor(raw_data[:,-2]).reshape(rows, 1)
-  print(distance_tensor[0:10,:])
 
   target = torch.cat((speed_tensor,distance_tensor,scalings_tensor), -1)
 
@@ -101,13 +97,13 @@ for d in range(len(list_dataset_name)):
           nn.Linear(dof+dof+3, 1000),
           nn.Tanh(),
           # nn.Dropout(p=0.1),
+        #   nn.Linear(1000, 1000),
+        #   nn.Tanh(),
+          # nn.Dropout(p=0.1),
           nn.Linear(1000, 1000),
           nn.Tanh(),
           # nn.Dropout(p=0.1),
-          nn.Linear(1000, 100),
-          nn.Tanh(),
-          # nn.Dropout(p=0.1),
-          nn.Linear(100, 3),
+          nn.Linear(1000, 3),
           nn.Sigmoid()
       ).to(device)
       load_net = True
@@ -131,8 +127,8 @@ for d in range(len(list_dataset_name)):
   train_loss_over_epoches = []
 
   plt.rcParams["figure.figsize"] = [12, 15]
-  ax = plt.GridSpec(6, 2)
-  ax.update(wspace=0.5, hspace=0.5)
+  ax = plt.GridSpec(7, 2)
+  ax.update(wspace=0.5, hspace=1.5)
 
   ax0 = plt.subplot(ax[0, :])
   ax1 = plt.subplot(ax[1, 0])
@@ -143,6 +139,10 @@ for d in range(len(list_dataset_name)):
   ax6 = plt.subplot(ax[3, 1])
   ax7 = plt.subplot(ax[4, 0])
   ax8 = plt.subplot(ax[4, 1])
+  ax9 = plt.subplot(ax[5, 0])
+  ax10 = plt.subplot(ax[5, 1])
+  ax11 = plt.subplot(ax[6, 0])
+  ax12 = plt.subplot(ax[6, 1])
 
   for epoch in range(n_epochs):
       # Training phase
@@ -216,6 +216,13 @@ for d in range(len(list_dataset_name)):
               val_targets = []
               val_output = []
               val_predictions_errors = []
+              val_speed = []
+              val_speed_error = []
+              val_distance = []
+              val_distance_error = []
+              val_target_speed = []
+              val_target_distance = []
+
               batches_loss = 0.0
 
               for i, batch in enumerate(val_dataloader, 0):
@@ -241,8 +248,14 @@ for d in range(len(list_dataset_name)):
 
                   val_output.extend(predictions[:,2].detach().cpu().numpy())
                   val_targets.extend(batch_targets[:,2].detach().cpu().numpy())
-                  val_predictions_errors.extend(batch_targets[:,2].detach().cpu().numpy()-predictions[:,2].detach().cpu(
-                  ).numpy())
+                  val_predictions_errors.extend(batch_targets[:,2].detach().cpu().numpy()-predictions[:,2].detach().cpu().numpy())
+                  val_speed.extend(predictions[:,0].detach().cpu().numpy())
+                  val_target_speed.extend(batch_targets[:,0].detach().cpu().numpy())
+                  val_speed_error.extend(batch_targets[:,0].detach().cpu().numpy()-predictions[:,0].detach().cpu().numpy())
+                  val_distance.extend(predictions[:,1].detach().cpu().numpy())
+                  val_target_distance.extend(batch_targets[:,1].detach().cpu().numpy())
+                  val_distance_error.extend(batch_targets[:,1].detach().cpu().numpy()-predictions[:,1].detach().cpu().numpy())
+
       print("-----------------------------------------------------------")
       # print(f"max err {max(train_predictions_errors)}")
 
@@ -257,7 +270,8 @@ for d in range(len(list_dataset_name)):
           val_loss_over_epoches.append(val_loss_per_epoch/len(val_dataloader))
 
           ax0.clear()
-          ax0.set(xlabel="Epoches", ylabel="Loss",
+          txt = "Epoches (x "+str(freq_epoch)+")"
+          ax0.set(xlabel=txt, ylabel="Loss",
                   title="Training and Validation Loss")
           ax0.grid(True)
           ax0.plot(val_loss_over_epoches)
@@ -277,40 +291,64 @@ for d in range(len(list_dataset_name)):
           ax2.plot(val_targets, val_output, '.')
 
           ax3.clear()
-          ax3.set(xlabel="Target", ylabel="Error",
-                  title="Prediction Error")
+          ax3.set(xlabel="Speed", ylabel="Error",
+                  title="Speed Error")
           ax3.grid(True)
-          ax3.plot(train_targets, train_predictions_errors, '.', color='orange')
+          ax3.plot(val_target_speed, val_speed_error, '.')
 
           ax4.clear()
-          ax4.set(xlabel="Target", ylabel="Prediction",
+          ax4.set(xlabel="Speed", ylabel="Prediction",
                   title="Target-Prediction")
           ax4.grid(True)
-          ax4.plot(train_targets, train_output, '.', color='orange')
+          ax4.plot(val_target_speed, val_speed, '.')
 
           ax5.clear()
-          ax5.set(xlabel="Speed", ylabel="Error",
-                  title="Speed Error")
+          ax5.set(xlabel="Distance", ylabel="Error",
+                  title="Distance Error")
           ax5.grid(True)
-          ax5.plot(train_target_speed, train_speed_error, '.', color='orange')
+          ax5.plot(val_target_distance, val_distance_error, '.')
 
           ax6.clear()
-          ax6.set(xlabel="Speed", ylabel="Predicted speed",
+          ax6.set(xlabel="Distance", ylabel="Prediction",
                   title="Target-Prediction")
           ax6.grid(True)
-          ax6.plot(train_target_speed, train_speed, '.', color='orange')
+          ax6.plot(val_target_distance, val_distance, '.')
 
           ax7.clear()
-          ax7.set(xlabel="Distance", ylabel="Error",
-                  title="Distance Error")
+          ax7.set(xlabel="Target", ylabel="Error",
+                  title="Prediction Error")
           ax7.grid(True)
-          ax7.plot(train_target_distance, train_distance_error, '.', color='orange')
+          ax7.plot(train_targets, train_predictions_errors, '.', color='orange')
 
           ax8.clear()
-          ax8.set(xlabel="Distance", ylabel="Predicted distance",
+          ax8.set(xlabel="Target", ylabel="Prediction",
                   title="Target-Prediction")
           ax8.grid(True)
-          ax8.plot(train_target_distance, train_distance, '.', color='orange')
+          ax8.plot(train_targets, train_output, '.', color='orange')
+
+          ax9.clear()
+          ax9.set(xlabel="Speed", ylabel="Error",
+                  title="Speed Error")
+          ax9.grid(True)
+          ax9.plot(train_target_speed, train_speed_error, '.', color='orange')
+
+          ax10.clear()
+          ax10.set(xlabel="Speed", ylabel="Prediction",
+                  title="Target-Prediction")
+          ax10.grid(True)
+          ax10.plot(train_target_speed, train_speed, '.', color='orange')
+
+          ax11.clear()
+          ax11.set(xlabel="Distance", ylabel="Error",
+                  title="Distance Error")
+          ax11.grid(True)
+          ax11.plot(train_target_distance, train_distance_error, '.', color='orange')
+
+          ax12.clear()
+          ax12.set(xlabel="Distance", ylabel="Prediction",
+                  title="Target-Prediction")
+          ax12.grid(True)
+          ax12.plot(train_target_distance, train_distance, '.', color='orange')
 
           plt.show(block=False)
           plt.draw()
