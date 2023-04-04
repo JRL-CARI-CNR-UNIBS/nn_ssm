@@ -44,7 +44,7 @@ for d in range(len(list_dataset_name)):
   if device == "cuda":
       if torch.cuda.device_count()>1:
         device = torch.device('cuda:1')
-      print(f"=> {torch.cuda.get_device_name()}")
+      print(f"=> {torch.cuda.get_device_name(device)}")
 
   # Load dataset
   raw_data = np.fromfile(dataset_path, dtype='float')
