@@ -11,17 +11,45 @@ load_net = False
 max_scaling = 1000
 fig_name = str(dof)+"dof.png"
 nn_name = "nn_ssm_complete.pt"
-list_dataset_name = ["1k","10k","25k","50k","75k","100k","125k","150k","200k","250k","500k"]
-list_n_epochs = [2000,2000,2000,3000,3000,3000,3000,3000,3000,3000,3000]
-list_batch_size = [64,64,64,128,128,264,264,264,328,328,328]
+list_dataset_name = ["10k","50k","150k","250k","500k"]
+list_n_epochs = [2000,3000,3000,3000,3000]
+list_batch_size = [64,264,264,328,328]
+lr_vector = [0.001,0.005,0.005,0.005,0.005]
+# list_dataset_name = ["1k","10k","25k","50k","75k","100k","125k","150k","200k","250k","500k"]
+# list_n_epochs = [1000,2000,2000,3000,3000,3000,3000,3000,3000,3000,3000]
+# list_batch_size = [64,64,64,128,128,264,264,264,328,328,328]
+# lr_vector = [0.001,0.001,0.001,0.001,0.001,0.001,0.001,0.001,0.001,0.001,0.001,0.001,]
 
 perc_train = 0.8
 loss_fcn = ""
-lr = 0.001
 
 freq_batch = 10
 freq_epoch = 10
 freq_clear_plot = 4000
+
+# class Net(nn.Module):
+#     def __init__(self):
+#       super(Net, self).__init__()
+#       self.l1 = nn.Linear(dof+dof+3, 1000)
+#       self.l2 = nn.Linear(1000, 1000)
+#       self.l3 = nn.Linear(1000, 100)
+#       self.l_out = nn.Linear(100, 3)
+      
+#       self.tanh = nn.Tanh()
+#       self.sigmoid = nn.Sigmoid()
+      
+
+#     def forward(self, x):
+#       x = self.l1(x)
+#       x = self.tanh(x)
+#       x = self.l2(x)
+#       x = self.tanh(x)
+#       x = self.l3(x)
+#       x = self.tanh(x)
+#       x = self.l_out(x)
+
+#       output = torch.cat((x[:,0:2],self.sigmoid(x[:,2].unsqueeze(1))), dim = 1)
+#       return output
 
 # Get paths
 PATH = os.path.dirname(os.path.abspath(__file__)) + "/data/"
@@ -31,6 +59,7 @@ for d in range(len(list_dataset_name)):
   dataset_name = "ssm_dataset_"+list_dataset_name[d]+".bin"
   n_epochs = list_n_epochs[d]
   batch_size = list_batch_size[d]
+  lr = lr_vector[d]
 
   # Get paths
   dataset_path = PATH + dataset_name
@@ -97,16 +126,19 @@ for d in range(len(list_dataset_name)):
           nn.Linear(dof+dof+3, 1000),
           nn.Tanh(),
           # nn.Dropout(p=0.1),
-        #   nn.Linear(1000, 1000),
-        #   nn.Tanh(),
-          # nn.Dropout(p=0.1),
           nn.Linear(1000, 1000),
           nn.Tanh(),
           # nn.Dropout(p=0.1),
-          nn.Linear(1000, 3),
+          nn.Linear(1000, 100),
+          nn.Tanh(),
+          # nn.Dropout(p=0.1),
+          nn.Linear(100, 3),
           nn.Sigmoid()
       ).to(device)
       load_net = True
+
+    #   NN = Net().to(device)
+    #   load_net = True
 
   print(NN)
 
@@ -173,9 +205,10 @@ for d in range(len(list_dataset_name)):
 
           # zero the parameter gradients
           optimizer.zero_grad()
-
+          
           # forward
           predictions = NN(batch_input)
+
 
           # backpropagation
           loss = criterion(predictions, batch_targets)

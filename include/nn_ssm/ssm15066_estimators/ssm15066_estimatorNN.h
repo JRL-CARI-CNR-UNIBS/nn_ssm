@@ -110,8 +110,8 @@ public:
     try {
       model_ = torch::jit::load(path_);
     }
-    catch (const torch::Error& error) {
-      std::cerr << "Could not load scriptmodule from file " << error << std::endl;
+    catch(...) {
+      std::cerr << "Could not load scriptmodule from file " << path_<< std::endl;
       throw std::runtime_error("Model not loaded!");
     }
 
