@@ -11,10 +11,10 @@ load_net = False
 max_scaling = 1000
 fig_name = str(dof)+"dof.png"
 nn_name = "nn_ssm_complete.pt"
-list_dataset_name = ["10k","50k","150k","250k","500k"]
-list_n_epochs = [2000,3000,3000,3000,3000]
-list_batch_size = [64,264,264,328,328]
-lr_vector = [0.001,0.005,0.005,0.005,0.005]
+list_dataset_name = ["10k"]
+list_n_epochs = [2000]
+list_batch_size = [64]
+lr_vector = [0.001]
 # list_dataset_name = ["1k","10k","25k","50k","75k","100k","125k","150k","200k","250k","500k"]
 # list_n_epochs = [1000,2000,2000,3000,3000,3000,3000,3000,3000,3000,3000]
 # list_batch_size = [64,64,64,128,128,264,264,264,328,328,328]
@@ -126,8 +126,10 @@ for d in range(len(list_dataset_name)):
           nn.Linear(dof+dof+3, 1000),
           nn.Tanh(),
           # nn.Dropout(p=0.1),
-          nn.Linear(1000, 1000),
-          nn.Tanh(),
+        #   nn.Linear(1000, 1000),
+        #   nn.Tanh(),
+        #   nn.Linear(1000, 1000),
+        #   nn.Tanh(),
           # nn.Dropout(p=0.1),
           nn.Linear(1000, 100),
           nn.Tanh(),

@@ -30,110 +30,110 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace ssm15066_estimator
 {
 
-SSM15066EstimatorNN::SSM15066EstimatorNN(const rosdyn::ChainPtr &chain, const double& max_step_size):
-  SSM15066Estimator2D(chain,max_step_size)
-{
-  setDevice();
-}
+//SSM15066EstimatorNN::SSM15066EstimatorNN(const rosdyn::ChainPtr &chain, const double& max_step_size):
+//  SSM15066Estimator2D(chain,max_step_size)
+//{
+//  setDevice();
+//}
 
-SSM15066EstimatorNN::SSM15066EstimatorNN(const rosdyn::ChainPtr &chain, const double &max_step_size, const Eigen::Matrix<double,3,Eigen::Dynamic> &obstacles_positions):
-  SSM15066Estimator2D(chain,max_step_size,obstacles_positions)
-{
-  setDevice();
-}
+//SSM15066EstimatorNN::SSM15066EstimatorNN(const rosdyn::ChainPtr &chain, const double &max_step_size, const Eigen::Matrix<double,3,Eigen::Dynamic> &obstacles_positions):
+//  SSM15066Estimator2D(chain,max_step_size,obstacles_positions)
+//{
+//  setDevice();
+//}
 
-SSM15066EstimatorNN::SSM15066EstimatorNN(const rosdyn::ChainPtr &chain, const std::string path, const double& max_step_size):
-  SSM15066Estimator2D(chain,max_step_size)
-{
-  setDevice();
-  loadModel(path);
-}
+//SSM15066EstimatorNN::SSM15066EstimatorNN(const rosdyn::ChainPtr &chain, const std::string path, const double& max_step_size):
+//  SSM15066Estimator2D(chain,max_step_size)
+//{
+//  setDevice();
+//  loadModel(path);
+//}
 
-SSM15066EstimatorNN::SSM15066EstimatorNN(const rosdyn::ChainPtr &chain, const std::string path, const double &max_step_size, const Eigen::Matrix<double,3,Eigen::Dynamic> &obstacles_positions):
-  SSM15066Estimator2D(chain,max_step_size,obstacles_positions)
-{
-  setDevice();
-  loadModel(path);
-}
+//SSM15066EstimatorNN::SSM15066EstimatorNN(const rosdyn::ChainPtr &chain, const std::string path, const double &max_step_size, const Eigen::Matrix<double,3,Eigen::Dynamic> &obstacles_positions):
+//  SSM15066Estimator2D(chain,max_step_size,obstacles_positions)
+//{
+//  setDevice();
+//  loadModel(path);
+//}
 
-std::vector<double> SSM15066EstimatorNN::feedforward(const std::vector<double>& input, const unsigned int& n_samples)
-{
-  unsigned int cols = input.size()/n_samples;
-  at::Tensor tensor =  torch::from_blob(input.data(),{n_samples,cols}, opt_);
-  assert(tensor.device() == device_);
+//std::vector<double> SSM15066EstimatorNN::feedforward(const std::vector<double>& input, const unsigned int& n_samples)
+//{
+//  unsigned int cols = input.size()/n_samples;
+//  at::Tensor tensor =  torch::from_blob(input.data(),{n_samples,cols}, opt_);
+//  assert(tensor.device() == device_);
 
-  std::vector<torch::jit::IValue> tensor_in;
-  tensor_in.push_back(tensor);
+//  std::vector<torch::jit::IValue> tensor_in;
+//  tensor_in.push_back(tensor);
 
-  at::Tensor tensor_out = model_.forward(tensor_in).toTensor();
+//  at::Tensor tensor_out = model_.forward(tensor_in).toTensor();
 
-  std::vector<double> output(tensor_out.data_ptr<double>(), tensor_out.data_ptr<double>() + tensor_out.numel());
-  return output;
-}
+//  std::vector<double> output(tensor_out.data_ptr<double>(), tensor_out.data_ptr<double>() + tensor_out.numel());
+//  return output;
+//}
 
-double SSM15066EstimatorNN::computeScalingFactor(const Eigen::VectorXd& q1, const Eigen::VectorXd& q2)
-{
-  if(obstacles_positions_.cols()==0)  //no obstacles in the scene
-    return 1.0;
+//double SSM15066EstimatorNN::computeScalingFactor(const Eigen::VectorXd& q1, const Eigen::VectorXd& q2)
+//{
+//  if(obstacles_positions_.cols()==0)  //no obstacles in the scene
+//    return 1.0;
 
-  if(verbose_>0)
-  {
-    ROS_ERROR_STREAM("number of obstacles: "<<obstacles_positions_.cols()<<", number of poi: "<<poi_names_.size());
-    for(unsigned int i=0;i<obstacles_positions_.cols();i++)
-      ROS_ERROR_STREAM("obs location -> "<<obstacles_positions_.col(i).transpose());
-  }
+//  if(verbose_>0)
+//  {
+//    ROS_ERROR_STREAM("number of obstacles: "<<obstacles_positions_.cols()<<", number of poi: "<<poi_names_.size());
+//    for(unsigned int i=0;i<obstacles_positions_.cols();i++)
+//      ROS_ERROR_STREAM("obs location -> "<<obstacles_positions_.col(i).transpose());
+//  }
 
-  /* Compute the time of each joint to move from q1 to q2 at its maximum speed and consider the longest time */
-  Eigen::VectorXd connection_vector = (q2-q1);
-  double slowest_joint_time = (inv_max_speed_.cwiseProduct(connection_vector)).cwiseAbs().maxCoeff();
+//  /* Compute the time of each joint to move from q1 to q2 at its maximum speed and consider the longest time */
+//  Eigen::VectorXd connection_vector = (q2-q1);
+//  double slowest_joint_time = (inv_max_speed_.cwiseProduct(connection_vector)).cwiseAbs().maxCoeff();
 
-  /* The "slowest" joint will move at its highest speed while the other ones will
-   * move at (t_i/slowest_joint_time)*max_speed_i, where slowest_joint_time >= t_i */
-  Eigen::VectorXd dq = connection_vector/slowest_joint_time;
+//  /* The "slowest" joint will move at its highest speed while the other ones will
+//   * move at (t_i/slowest_joint_time)*max_speed_i, where slowest_joint_time >= t_i */
+//  Eigen::VectorXd dq = connection_vector/slowest_joint_time;
 
-  if(verbose_>0)
-    ROS_ERROR_STREAM("joint velocity "<<dq.norm());
+//  if(verbose_>0)
+//    ROS_ERROR_STREAM("joint velocity "<<dq.norm());
 
-  unsigned int iter = std::max(std::ceil((connection_vector).norm()/max_step_size_),1.0);
+//  unsigned int iter = std::max(std::ceil((connection_vector).norm()/max_step_size_),1.0);
 
-  Eigen::VectorXd q;
-  Eigen::VectorXd delta_q = connection_vector/iter;
+//  Eigen::VectorXd q;
+//  Eigen::VectorXd delta_q = connection_vector/iter;
 
-  double max_scaling_factor_of_q;
-  double sum_scaling_factor = 0.0;
+//  double max_scaling_factor_of_q;
+//  double sum_scaling_factor = 0.0;
 
-  for(unsigned int i=0;i<iter+1;i++)
-  {
-    //CREA VETTORE CON SAMPLES
-    q = q1+i*delta_q;
-    max_scaling_factor_of_q = computeScalingFactorAtQ(q,dq); //CHIAMA RETE NEURALE
-    //ESTRAI RISULTATI
+//  for(unsigned int i=0;i<iter+1;i++)
+//  {
+//    //CREA VETTORE CON SAMPLES
+//    q = q1+i*delta_q;
+//    max_scaling_factor_of_q = computeScalingFactorAtQ(q,dq); //CHIAMA RETE NEURALE
+//    //ESTRAI RISULTATI
 
-    if(max_scaling_factor_of_q == std::numeric_limits<double>::infinity())
-      return std::numeric_limits<double>::infinity();
-    else
-      sum_scaling_factor += max_scaling_factor_of_q;
-  }
+//    if(max_scaling_factor_of_q == std::numeric_limits<double>::infinity())
+//      return std::numeric_limits<double>::infinity();
+//    else
+//      sum_scaling_factor += max_scaling_factor_of_q;
+//  }
 
-  // return the average scaling factor
-  double res = sum_scaling_factor/((double) iter+1);
-  return res;
-}
+//  // return the average scaling factor
+//  double res = sum_scaling_factor/((double) iter+1);
+//  return res;
+//}
 
-double SSM15066EstimatorNN::computeScalingFactorAtQ(const Eigen::VectorXd& q, const Eigen::VectorXd& dq,  double& tangential_speed, double& distance)
-{
-  // TODO
-}
+//double SSM15066EstimatorNN::computeScalingFactorAtQ(const Eigen::VectorXd& q, const Eigen::VectorXd& dq,  double& tangential_speed, double& distance)
+//{
+//  // TODO
+//}
 
-pathplan::CostPenaltyPtr SSM15066EstimatorNN::clone()
-{
-  // TODO
-  SSM15066EstimatorNNPtr ssm_cloned = std::make_shared<SSM15066EstimatorNN>(chain_->clone(),max_step_size_,obstacles_positions_);
+//pathplan::CostPenaltyPtr SSM15066EstimatorNN::clone()
+//{
+//  // TODO
+//  SSM15066EstimatorNNPtr ssm_cloned = std::make_shared<SSM15066EstimatorNN>(chain_->clone(),max_step_size_,obstacles_positions_);
 
-  pathplan::CostPenaltyPtr clone = ssm_cloned;
+//  pathplan::CostPenaltyPtr clone = ssm_cloned;
 
-  return clone;
-}
+//  return clone;
+//}
 
 
 }
