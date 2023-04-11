@@ -13,7 +13,12 @@ namespace = "ssm_nn"
 
 PATH = os.path.dirname(os.path.abspath(__file__)) + "/data/"
 
-NN = torch.load(PATH+nn_name)
+NN = nn.Sequential(
+    nn.Linear(2, 2),
+    nn.Sigmoid(),
+    nn.Linear(2, 2),
+    nn.Sigmoid()
+)
 
 last_key = ""
 nn_dict = {}
@@ -31,6 +36,12 @@ for layer in NN.children():
         bias = parameters_to_vector(layer.bias).detach().cpu().numpy().tolist()
         last_key = "layer"+str(i)
         nn_dict[last_key] = {"nodes": n_nodes,"weights": weights, "bias": bias}
+
+        for j in range(len(layer.weight)):
+          print(f"layer{i} -> weight{j}: {layer.weight[j]}")
+
+        for j in range(len(layer.bias)):
+          print(f"layer{i} -> bias{j}: {layer.bias[j]}")
         
         i = i+1
     elif isinstance(layer, nn.ReLU):
@@ -44,6 +55,5 @@ for layer in NN.children():
 
 dict = {namespace: nn_dict}
 
-with open(PATH+"MODEL.yaml", 'w') as f:
+with open(PATH+"MODEL_prova.yaml", 'w') as f:
     yaml.dump(dict, f)   
-
