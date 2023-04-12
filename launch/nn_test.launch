@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<launch>
+  <rosparam command="load" file="$(find nn_ssm)/config/nn_test.yaml"/>
+  <rosparam command="load" file="$(find nn_ssm)/config/test_nn_saving.yaml"/>
+
+
+  <node pkg="nn_ssm"
+        name="nn_test"
+        type="nn_test"
+        output="screen"
+        launch-prefix="gdb -ex run --args"> 
+ </node>
+
+</launch>

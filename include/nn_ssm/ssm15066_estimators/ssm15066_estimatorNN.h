@@ -27,8 +27,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 #include <ssm15066_estimators/ssm15066_estimator2D.h>
-#include <torch/torch.h>
-#include <torch/script.h>
+#include <nn_ssm/neural_networks/neural_network.h>
 
 namespace ssm15066_estimator
 {
@@ -36,7 +35,8 @@ class SSM15066EstimatorNN;
 typedef std::shared_ptr<SSM15066EstimatorNN> SSM15066EstimatorNNPtr;
 
 /**
-  * @brief The SSM15066EstimatorNN class uses a Neural Network (NN) to approximate with a faster computation SSM15066Estimator2D
+  * @brief The SSM15066EstimatorNN class uses a Neural Network (NN) to approximate with a faster computation SSM15066Estimator2D.
+  * It uses a neural network trained to estimate the lambda given q_parent, q_child and (x,y,z) of an obstacle. As output, it gives the inverse of lambda.
   * Note that these class members are set but never used because they are intrinsic in the trained neural network:
   *   - chain_
   *   - poi_names_
@@ -46,6 +46,7 @@ typedef std::shared_ptr<SSM15066EstimatorNN> SSM15066EstimatorNNPtr;
   *   - reaction_time_
   *   - max_cart_acc_
   *   - min_distance_
+  *   - max_step_size_
   *   - term1_
   *   - term2_
   * If you want to change them you should train another neural network
@@ -53,73 +54,14 @@ typedef std::shared_ptr<SSM15066EstimatorNN> SSM15066EstimatorNNPtr;
 class SSM15066EstimatorNN: public SSM15066Estimator2D
 {
 protected:
-  /**
-  * @brief model_ is the pre-trained neural network model
-  */
-  torch::jit::script::Module model_;
-
-  /**
-   * @brief path_ is the absolute path to the pre-trained neural network
-   */
-  std::string path_;
-
-  /**
-   * @brief cuda_available_ is true when the model can run on cuda
-   */
-  bool cuda_available_;
-
-  /**
-   * @brief device_ is the device used to do inferences
-   */
-  at::Device device_;
-
-  /**
-   * @brief opt_ options
-   */
-  at::TensorOptions opt_;
-
-  void setDevice()
-  {
-    cuda_available_ = torch::cuda::is_available();
-    at::Device device(cuda_available_ ? at::kCUDA : at::kCPU);
-    device_ = device;
-
-    opt_.device(device_);
-    opt_.dtype(at::kFloat);
-    opt_.requires_grad(false);
-  }
-
-  std::vector<double> feedforward(const std::vector<double>& input, const unsigned int &n_samples);
-
+  neural_network::NeuralNetworkPtr nn_;
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-  SSM15066EstimatorNN(const rosdyn::ChainPtr &chain, const double& max_step_size=0.05);
-  SSM15066EstimatorNN(const rosdyn::ChainPtr &chain, const std::string path, const double& max_step_size=0.05);
-  SSM15066EstimatorNN(const rosdyn::ChainPtr &chain, const double& max_step_size,
-                      const Eigen::Matrix<double,3,Eigen::Dynamic>& obstacles_positions);
-  SSM15066EstimatorNN(const rosdyn::ChainPtr &chain, const std::string path, const double& max_step_size,
+  SSM15066EstimatorNN(const rosdyn::ChainPtr &chain, const neural_network::NeuralNetworkPtr& nn);
+  SSM15066EstimatorNN(const rosdyn::ChainPtr &chain, const neural_network::NeuralNetworkPtr& nn,
                       const Eigen::Matrix<double,3,Eigen::Dynamic>& obstacles_positions);
 
-  /**
-   * @brief loadModel loads the pre-trained neural network model
-   * @param path is the absolute path to the pretrained model
-   */
-  void loadModel(const std::string& path)
-  {
-    path_ = path;
-    try {
-      model_ = torch::jit::load(path_);
-    }
-    catch(...) {
-      std::cerr << "Could not load scriptmodule from file " << path_<< std::endl;
-      throw std::runtime_error("Model not loaded!");
-    }
 
-    model_.eval();
-    model_.to(device_);
-  }
-
-  virtual double computeScalingFactorAtQ(const Eigen::VectorXd& q, const Eigen::VectorXd& dq, double& tangential_speed, double& distance) override;
   virtual double computeScalingFactor(const Eigen::VectorXd& q1, const Eigen::VectorXd& q2) override;
   virtual pathplan::CostPenaltyPtr clone() override;
 };

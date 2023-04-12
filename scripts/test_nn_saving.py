@@ -14,11 +14,17 @@ namespace = "ssm_nn"
 PATH = os.path.dirname(os.path.abspath(__file__)) + "/data/"
 
 NN = nn.Sequential(
-    nn.Linear(2, 2),
+    nn.Linear(3, 4),
     nn.Sigmoid(),
-    nn.Linear(2, 2),
+    nn.Linear(4, 2),
     nn.Sigmoid()
 )
+
+input = [[1,2,3],[3,4,5]]
+input_t = torch.tensor(input, dtype=torch.float32)
+out = NN(input_t)
+
+print(f"out {out}")
 
 last_key = ""
 nn_dict = {}
@@ -35,7 +41,7 @@ for layer in NN.children():
         weights = parameters_to_vector(layer.weight).detach().cpu().numpy().tolist()
         bias = parameters_to_vector(layer.bias).detach().cpu().numpy().tolist()
         last_key = "layer"+str(i)
-        nn_dict[last_key] = {"nodes": n_nodes,"weights": weights, "bias": bias}
+        nn_dict[last_key] = {"neurons": n_nodes,"weights": weights, "bias": bias}
 
         for j in range(len(layer.weight)):
           print(f"layer{i} -> weight{j}: {layer.weight[j]}")
@@ -55,5 +61,5 @@ for layer in NN.children():
 
 dict = {namespace: nn_dict}
 
-with open(PATH+"MODEL_prova.yaml", 'w') as f:
+with open(PATH+"test_nn_saving.yaml", 'w') as f:
     yaml.dump(dict, f)   

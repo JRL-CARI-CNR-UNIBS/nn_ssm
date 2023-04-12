@@ -1,0 +1,7 @@
+
+namespace: ssm_nn
+sample1: [1,2,3]
+sample2: [3,4,5]
+
+#expected output [0.3488, 0.4801],[0.3478, 0.4904]
+

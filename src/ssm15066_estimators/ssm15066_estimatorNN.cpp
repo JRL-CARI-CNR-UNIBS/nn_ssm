@@ -29,111 +29,55 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace ssm15066_estimator
 {
+SSM15066EstimatorNN::SSM15066EstimatorNN(const rosdyn::ChainPtr &chain, const neural_network::NeuralNetworkPtr& nn):
+  SSM15066Estimator2D(chain),nn_(nn)
+{}
+SSM15066EstimatorNN::SSM15066EstimatorNN(const rosdyn::ChainPtr &chain, const neural_network::NeuralNetworkPtr& nn,
+                                         const Eigen::Matrix<double,3,Eigen::Dynamic>& obstacles_positions):SSM15066Estimator2D(chain),nn_(nn)
+{
+  setObstaclesPositions(obstacles_positions);
+}
 
-//SSM15066EstimatorNN::SSM15066EstimatorNN(const rosdyn::ChainPtr &chain, const double& max_step_size):
-//  SSM15066Estimator2D(chain,max_step_size)
-//{
-//  setDevice();
-//}
+double SSM15066EstimatorNN::computeScalingFactor(const Eigen::VectorXd& q1, const Eigen::VectorXd& q2)
+{
+  if(obstacles_positions_.cols()==0)  //no obstacles in the scene
+    return 1.0;
 
-//SSM15066EstimatorNN::SSM15066EstimatorNN(const rosdyn::ChainPtr &chain, const double &max_step_size, const Eigen::Matrix<double,3,Eigen::Dynamic> &obstacles_positions):
-//  SSM15066Estimator2D(chain,max_step_size,obstacles_positions)
-//{
-//  setDevice();
-//}
+  neural_network::MatrixXn input (q1.size()*2+3,obstacles_positions_.cols()); //rows -> q1+q2+(x,y,z)  cols -> n_obstacles
+  neural_network::MatrixXn output(1+q1.size()  ,obstacles_positions_.cols()); //rows -> scaling + dq   cols -> n_obstacles
+  for(Eigen::Index i_obs=0;i_obs<obstacles_positions_.cols();i_obs++)
+    input.col(i_obs) << q1,q2,obstacles_positions_.col(i_obs)[0],obstacles_positions_.col(i_obs)[1],obstacles_positions_.col(i_obs)[2];
 
-//SSM15066EstimatorNN::SSM15066EstimatorNN(const rosdyn::ChainPtr &chain, const std::string path, const double& max_step_size):
-//  SSM15066Estimator2D(chain,max_step_size)
-//{
-//  setDevice();
-//  loadModel(path);
-//}
+  output = nn_->forward(input);
 
-//SSM15066EstimatorNN::SSM15066EstimatorNN(const rosdyn::ChainPtr &chain, const std::string path, const double &max_step_size, const Eigen::Matrix<double,3,Eigen::Dynamic> &obstacles_positions):
-//  SSM15066Estimator2D(chain,max_step_size,obstacles_positions)
-//{
-//  setDevice();
-//  loadModel(path);
-//}
+  // First element of each column is the scaling expressed between 0 and 1. Find the worst case and reverse it!
+  double scaling = output.row(0).minCoeff();
+  if(scaling<1e-03)
+    scaling = std::numeric_limits<double>::infinity();
+  else
+    scaling = 1.0/scaling;
 
-//std::vector<double> SSM15066EstimatorNN::feedforward(const std::vector<double>& input, const unsigned int& n_samples)
-//{
-//  unsigned int cols = input.size()/n_samples;
-//  at::Tensor tensor =  torch::from_blob(input.data(),{n_samples,cols}, opt_);
-//  assert(tensor.device() == device_);
+  return scaling;
+}
 
-//  std::vector<torch::jit::IValue> tensor_in;
-//  tensor_in.push_back(tensor);
+pathplan::CostPenaltyPtr SSM15066EstimatorNN::clone()
+{
+  SSM15066EstimatorNNPtr ssm_cloned = std::make_shared<SSM15066EstimatorNN>(chain_->clone(),nn_->clone());
 
-//  at::Tensor tensor_out = model_.forward(tensor_in).toTensor();
+  ssm_cloned->setPoiNames(poi_names_);
+  ssm_cloned->setMaxStepSize(max_step_size_);
+  ssm_cloned->setObstaclesPositions(obstacles_positions_);
 
-//  std::vector<double> output(tensor_out.data_ptr<double>(), tensor_out.data_ptr<double>() + tensor_out.numel());
-//  return output;
-//}
+  ssm_cloned->setMaxCartAcc(max_cart_acc_,false);
+  ssm_cloned->setMinDistance(min_distance_,false);
+  ssm_cloned->setReactionTime(reaction_time_,false);
+  ssm_cloned->setHumanVelocity(human_velocity_,false);
 
-//double SSM15066EstimatorNN::computeScalingFactor(const Eigen::VectorXd& q1, const Eigen::VectorXd& q2)
-//{
-//  if(obstacles_positions_.cols()==0)  //no obstacles in the scene
-//    return 1.0;
+  ssm_cloned->updateMembers();
 
-//  if(verbose_>0)
-//  {
-//    ROS_ERROR_STREAM("number of obstacles: "<<obstacles_positions_.cols()<<", number of poi: "<<poi_names_.size());
-//    for(unsigned int i=0;i<obstacles_positions_.cols();i++)
-//      ROS_ERROR_STREAM("obs location -> "<<obstacles_positions_.col(i).transpose());
-//  }
+  pathplan::CostPenaltyPtr clone = ssm_cloned;
 
-//  /* Compute the time of each joint to move from q1 to q2 at its maximum speed and consider the longest time */
-//  Eigen::VectorXd connection_vector = (q2-q1);
-//  double slowest_joint_time = (inv_max_speed_.cwiseProduct(connection_vector)).cwiseAbs().maxCoeff();
-
-//  /* The "slowest" joint will move at its highest speed while the other ones will
-//   * move at (t_i/slowest_joint_time)*max_speed_i, where slowest_joint_time >= t_i */
-//  Eigen::VectorXd dq = connection_vector/slowest_joint_time;
-
-//  if(verbose_>0)
-//    ROS_ERROR_STREAM("joint velocity "<<dq.norm());
-
-//  unsigned int iter = std::max(std::ceil((connection_vector).norm()/max_step_size_),1.0);
-
-//  Eigen::VectorXd q;
-//  Eigen::VectorXd delta_q = connection_vector/iter;
-
-//  double max_scaling_factor_of_q;
-//  double sum_scaling_factor = 0.0;
-
-//  for(unsigned int i=0;i<iter+1;i++)
-//  {
-//    //CREA VETTORE CON SAMPLES
-//    q = q1+i*delta_q;
-//    max_scaling_factor_of_q = computeScalingFactorAtQ(q,dq); //CHIAMA RETE NEURALE
-//    //ESTRAI RISULTATI
-
-//    if(max_scaling_factor_of_q == std::numeric_limits<double>::infinity())
-//      return std::numeric_limits<double>::infinity();
-//    else
-//      sum_scaling_factor += max_scaling_factor_of_q;
-//  }
-
-//  // return the average scaling factor
-//  double res = sum_scaling_factor/((double) iter+1);
-//  return res;
-//}
-
-//double SSM15066EstimatorNN::computeScalingFactorAtQ(const Eigen::VectorXd& q, const Eigen::VectorXd& dq,  double& tangential_speed, double& distance)
-//{
-//  // TODO
-//}
-
-//pathplan::CostPenaltyPtr SSM15066EstimatorNN::clone()
-//{
-//  // TODO
-//  SSM15066EstimatorNNPtr ssm_cloned = std::make_shared<SSM15066EstimatorNN>(chain_->clone(),max_step_size_,obstacles_positions_);
-
-//  pathplan::CostPenaltyPtr clone = ssm_cloned;
-
-//  return clone;
-//}
-
+  return clone;
+}
 
 }

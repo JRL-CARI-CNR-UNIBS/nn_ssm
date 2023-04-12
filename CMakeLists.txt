@@ -5,18 +5,11 @@ set(CMAKE_BUILD_TYPE Debug)
 
 add_compile_options(-std=c++14)
 
-# Locate the cmake file of torchlib
-#list(APPEND CMAKE_PREFIX_PATH "${CMAKE_CURRENT_LIST_DIR}/libtorch/share/cmake/Torch")
-set(Torch_DIR "${CMAKE_CURRENT_LIST_DIR}/libtorch/share/cmake/Torch")
-
 find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
   ssm15066_estimators
 )
-
-find_package(Torch REQUIRED)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
 
 catkin_package(
   INCLUDE_DIRS include
@@ -28,16 +21,14 @@ catkin_package(
 include_directories(
   include
   ${catkin_INCLUDE_DIRS}
-  ${Torch_INCLUDE_DIRS}
 )
 
 add_library(${PROJECT_NAME}
 src/neural_networks/neural_network.cpp
 src/ssm15066_estimators/ssm15066_estimatorNN.cpp
 )
-add_dependencies(${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS} ${TORCH_EXPORTED_TARGETS})
-target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES} ${TORCH_LIBRARIES})
-set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 14)
+add_dependencies(${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES})
 
 add_executable(create_dataset src/create_dataset.cpp)
 add_dependencies(create_dataset ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
@@ -54,5 +45,11 @@ target_link_libraries(create_dataset2
 add_executable(create_dataset_connection src/create_dataset_connection.cpp)
 add_dependencies(create_dataset_connection ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 target_link_libraries(create_dataset_connection
+ ${catkin_LIBRARIES}
+)
+
+add_executable(nn_test src/neural_networks/nn_test.cpp)
+add_dependencies(nn_test ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(nn_test
  ${catkin_LIBRARIES}
 )
