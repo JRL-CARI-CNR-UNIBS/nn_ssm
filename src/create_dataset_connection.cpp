@@ -37,11 +37,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 struct Sample
 {
-  Eigen::VectorXd parent, child;
-  Eigen::VectorXd dq;
+  Eigen::VectorXd parent, child, dq;
   std::vector<std::vector<double>> obstacles;
-
-  double scaling;
+  double scaling, min_scaling, max_scaling, distance_min_scaling, distance_max_scaling, speed_min_scaling, speed_max_scaling;
 };
 
 void random_replace(std::vector<Sample>& v, const Sample& sample)
@@ -98,12 +96,6 @@ int main(int argc, char **argv)
 
   double v_h;
   nh.getParam("v_h",v_h);
-
-  double max_tang_speed;
-  nh.getParam("max_tang_speed",max_tang_speed);
-
-  double max_distance;
-  nh.getParam("max_distance",max_distance);
 
   std::vector<std::string> poi_names;
   nh.getParam("poi_names",poi_names);
@@ -242,6 +234,8 @@ int main(int argc, char **argv)
     sample.dq = dq_scaled;
     sample.obstacles = obstacles;
     sample.scaling  = ssm->computeScalingFactor(parent,child); //parent and child, not scaled!
+    sample.min_scaling = ssm->getMinScaling(sample.speed_min_scaling,sample.distance_min_scaling);
+    sample.max_scaling = ssm->getMaxScaling(sample.speed_max_scaling,sample.distance_max_scaling);
 
     // Create a balanced dataset
     if(sample.scaling == 1.0)
@@ -465,8 +459,6 @@ int main(int argc, char **argv)
   file_params.write((char*) &n_objects        , sizeof(n_objects                   ));
   file_params.write((char*) &n_iter           , sizeof(n_iter                      ));
   file_params.write((char*) &min_safe_distance, sizeof(min_safe_distance           ));
-  file_params.write((char*) &max_tang_speed   , sizeof(max_tang_speed              ));
-  file_params.write((char*) &max_distance     , sizeof(max_distance                ));
   file_params.write((char*) &poi_names[0]     , sizeof(std::string)*poi_names.size());
   file_params.write((char*) &min_range[0]     , sizeof(double)     *min_range.size());
   file_params.write((char*) &max_range[0]     , sizeof(double)     *max_range.size());
@@ -482,9 +474,57 @@ int main(int argc, char **argv)
 
   file.rdbuf()->pubsetbuf(buf.get(), bufsize);
 
+  double max_hr_distance = 0;
+  double max_tang_speed = 0;
+  for(const Sample& sample:samples)
+  {
+    if(sample.distance_max_scaling>max_hr_distance)
+      max_hr_distance = sample.distance_max_scaling;
+    if(sample.distance_min_scaling>max_hr_distance)
+      max_hr_distance = sample.distance_min_scaling;
+
+    if(sample.speed_max_scaling>max_tang_speed)
+      max_tang_speed = sample.speed_max_scaling;
+    if(sample.speed_min_scaling>max_tang_speed)
+      max_tang_speed = sample.speed_min_scaling;
+  }
+
+  double min_tang_speed = -max_tang_speed;
+
+  assert(max_hr_distance>0.0 && max_tang_speed>0.0);
+
+  double max_scaling = 1000;
+  for(Sample& sample:samples)
+  {
+    sample.distance_max_scaling = (sample.distance_max_scaling/max_hr_distance);
+    sample.distance_min_scaling = (sample.distance_min_scaling/max_hr_distance);
+
+    sample.speed_max_scaling = ((sample.speed_max_scaling-min_tang_speed)/(max_tang_speed-min_tang_speed));
+    sample.speed_min_scaling = ((sample.speed_min_scaling-min_tang_speed)/(max_tang_speed-min_tang_speed));
+
+    sample.scaling >= max_scaling?
+          (sample.scaling = 0.0):
+          (sample.scaling = 1.0/sample.scaling);
+
+    sample.min_scaling >= max_scaling?
+          (sample.min_scaling = 0.0):
+          (sample.min_scaling = 1.0/sample.min_scaling);
+
+    sample.max_scaling >= max_scaling?
+          (sample.max_scaling = 0.0):
+          (sample.max_scaling = 1.0/sample.max_scaling);
+
+    assert(sample.scaling             <=1 && sample.scaling             >=0);
+    assert(sample.min_scaling         <=1 && sample.min_scaling         >=0);
+    assert(sample.max_scaling         <=1 && sample.max_scaling         >=0);
+    assert(sample.speed_max_scaling   <=1 && sample.speed_max_scaling   >=0);
+    assert(sample.speed_min_scaling   <=1 && sample.speed_min_scaling   >=0);
+    assert(sample.distance_max_scaling<=1 && sample.distance_max_scaling>=0);
+    assert(sample.distance_min_scaling<=1 && sample.distance_min_scaling>=0);
+  }
+
   std::vector<double> tmp;
   std::vector<double> sample_vector;
-
   for(const Sample& sample:samples)
   {
     sample_vector.clear();
@@ -510,6 +550,18 @@ int main(int argc, char **argv)
     tmp.resize(sample.dq.size());
     Eigen::VectorXd::Map(&tmp[0], sample.dq.size()) = sample.dq;
     sample_vector.insert(sample_vector.end(),tmp.begin(),tmp.end());
+
+    //min/max speed
+    sample_vector.push_back(sample.speed_min_scaling);
+    sample_vector.push_back(sample.speed_max_scaling);
+
+    //min/max distance
+    sample_vector.push_back(sample.distance_min_scaling);
+    sample_vector.push_back(sample.distance_max_scaling);
+
+    // min/max scaling
+    sample_vector.push_back(sample.min_scaling);
+    sample_vector.push_back(sample.max_scaling);
 
     // scaling
     sample_vector.push_back(sample.scaling);

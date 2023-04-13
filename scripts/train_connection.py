@@ -55,26 +55,29 @@ for d in range(len(list_dataset_name)):
   raw_data = np.fromfile(dataset_path, dtype='float')
   length = raw_data.size
 
-  # parent, child, (x,y,z) of obstacle, dq, scaling
-  cols = dof + dof + 3 + dof + 1
+  # parent, child, (x,y,z) of obstacle, dq, min speed, max speed, min dist, max dist, min scaling, max scaling, scaling
+  cols = dof + dof + 3 + dof + 7
   rows = int(length/cols)
 
   # from array to multi-dimensional-array
   raw_data = raw_data.reshape(rows, cols)
 
-  # Transform scalings values
-  scalings = raw_data[:, -1]  # last column
-  scalings = np.where(scalings > max_scaling, 0.0, (1.0 /
-                      scalings))   # scaling between 0.0 and 1.0
+#   # Transform scalings values
+#   scalings = raw_data[:, -1]  # last column
+#   scalings = np.where(scalings > max_scaling, 0.0, (1.0 /
+#                       scalings))   # scaling between 0.0 and 1.0
 
   # Create training and validation datasets
 
   # q, dq, (x,y,z) of obstacle (first, second, last columns excluded)
-  input = torch.Tensor(raw_data[:, 0:(dof+dof+3)]).reshape(rows,(dof+dof+3))
-  scalings_tensor = torch.Tensor(scalings).reshape(rows, 1)
-  speed_tensor = torch.Tensor(raw_data[:,(-dof-1):-1]).reshape(rows, dof)
+#   input = torch.Tensor(raw_data[:, 0:(dof+dof+3)]).reshape(rows,(dof+dof+3))
+#   scalings_tensor = torch.Tensor(scalings).reshape(rows, 1)
+#   speed_tensor = torch.Tensor(raw_data[:,(-dof-1):-1]).reshape(rows, dof)
 
-  target = torch.cat((speed_tensor,scalings_tensor), -1)
+#   target = torch.cat((speed_tensor,scalings_tensor), -1)
+
+  input = torch.Tensor(raw_data[:, 0:(dof+dof+3)]).reshape(rows,(dof+dof+3))
+  target = torch.Tensor(raw_data[:, (dof+dof+3):]).reshape(rows,(dof+7))
 
   # random shuffle
   indices = torch.randperm(input.size()[0])
@@ -98,11 +101,13 @@ for d in range(len(list_dataset_name)):
       NN = torch.load(nn_path_shared)
   else:
       NN = nn.Sequential(
-          nn.Linear(dof+dof+3, 10),
+          nn.Linear(dof+dof+3, 1000),
           nn.Tanh(),
-          nn.Linear(10, 10),
+          nn.Linear(1000, 1000),
           nn.Tanh(),
-          nn.Linear(10, dof+1),
+          nn.Linear(1000, 1000),
+          nn.Tanh(),
+          nn.Linear(1000, dof+7),
           nn.Sigmoid()
       ).to(device)
       load_net = True
