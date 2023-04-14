@@ -200,7 +200,7 @@ int main(int argc, char **argv)
         output = output+"\033[1;5;32m Succesfully completed!\033[0m\n";
       }
 
-      std::cout<<output;
+//      std::cout<<output;
     }
   }
 

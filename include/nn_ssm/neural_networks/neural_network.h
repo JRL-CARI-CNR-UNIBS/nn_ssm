@@ -34,8 +34,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace neural_network{
 
 using data_type = double;
-typedef Eigen::Matrix<data_type, Eigen::Dynamic, Eigen::Dynamic> MatrixXn;
-typedef Eigen::Matrix<data_type, Eigen::Dynamic, 1> VectorXn;
+//typedef Eigen::Matrix<data_type, Eigen::Dynamic, Eigen::Dynamic> MatrixXn;
+//typedef Eigen::Matrix<data_type, Eigen::Dynamic, 1> VectorXn;
+typedef Eigen::MatrixXd MatrixXn;
+typedef Eigen::VectorXd VectorXn;
 
 class NeuralNetwork;
 typedef std::shared_ptr<NeuralNetwork> NeuralNetworkPtr;
@@ -236,7 +238,13 @@ public:
     assert(activations_.size() == weights_.size());
 
     // number of layers == weights_.size() (we have a matrix of weights for each layer)
-    for(uint layer = 0; layer<weights_.size();layer++)
+
+//    ros::WallTime tic, tic_init;
+//    double time1,time2,time3,time;
+
+
+//    ROS_INFO("------------------------------------------");
+    for(uint layer=0;layer<weights_.size();layer++)
     {
       assert(weights_[layer].cols() == inputs  .rows());
       assert(weights_[layer].rows() == bias_[layer].rows());
@@ -245,9 +253,25 @@ public:
       // | weight11 weight12 weight13 .. |*|sample11 sample21 .. |    weights -> each row is associated to a neuron
       // | weight21 weight22 weight23 .. | |sample12 sample22 .. |    samples -> each col is a sample
       //                                   |sample13 sample23 .. |
+//      tic_init = ros::WallTime::now();
 
-      inputs = (weights_[layer]*inputs).colwise() + bias_[layer];  //bias is applied column-wise
-      inputs = inputs.unaryExpr(activations_[layer]);              // activation is applied element-wise
+//      tic = ros::WallTime::now();
+//      inputs = weights_[layer]*inputs;
+//      time1 = (ros::WallTime::now()-tic).toSec();
+
+//      tic = ros::WallTime::now();
+//      inputs = inputs.colwise() + bias_[layer];  //bias is applied column-wise
+//      time2 = (ros::WallTime::now()-tic).toSec();
+
+//      tic = ros::WallTime::now();
+//      inputs = inputs.unaryExpr(activations_[layer]);              // activation is applied element-wise
+//      time3 = (ros::WallTime::now()-tic).toSec();
+
+//      time = (ros::WallTime::now()-tic_init).toSec();
+
+//      ROS_INFO_STREAM("time1 "<<(time1/time)*100<<" time2 "<<(time2/time)*100<<" time3 "<<(time3/time)*100);
+
+      inputs = ((weights_[layer]*inputs).colwise() + bias_[layer]).unaryExpr(activations_[layer]);
     }
 
     return inputs;
