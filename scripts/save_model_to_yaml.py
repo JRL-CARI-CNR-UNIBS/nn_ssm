@@ -14,6 +14,7 @@ namespace = "ssm_nn"
 PATH = os.path.dirname(os.path.abspath(__file__)) + "/data/"
 
 NN = torch.load(PATH+nn_name)
+print(NN)
 
 last_key = ""
 nn_dict = {}
@@ -26,11 +27,11 @@ for layer in NN.children():
             n_inputs = layer.in_features
             nn_dict["inputs"] =  n_inputs
         
-        n_nodes = layer.out_features
+        n_neurons = layer.out_features
         weights = parameters_to_vector(layer.weight).detach().cpu().numpy().tolist()
         bias = parameters_to_vector(layer.bias).detach().cpu().numpy().tolist()
         last_key = "layer"+str(i)
-        nn_dict[last_key] = {"nodes": n_nodes,"weights": weights, "bias": bias}
+        nn_dict[last_key] = {"neurons": n_neurons,"weights": weights, "bias": bias}
         
         i = i+1
     elif isinstance(layer, nn.ReLU):

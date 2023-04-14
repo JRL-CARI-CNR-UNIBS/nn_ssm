@@ -7,13 +7,13 @@ import matplotlib.pyplot as plt
 
 # Params
 dof = 6
-load_net = False
+load_net = True
 max_scaling = 1000
 fig_name = str(dof)+"dof.png"
 nn_name = "nn_ssm_complete.pt"
 list_dataset_name = ["250k"]
 list_n_epochs = [5000]
-list_batch_size = [256]
+list_batch_size = [128]
 lr_vector = [0.001]
 # list_dataset_name = ["1k","10k","25k","50k","75k","100k","125k","150k","200k","250k","500k"]
 # list_n_epochs = [1000,2000,2000,3000,3000,3000,3000,3000,3000,3000,3000]
@@ -101,13 +101,13 @@ for d in range(len(list_dataset_name)):
       NN = torch.load(nn_path_shared)
   else:
       NN = nn.Sequential(
-          nn.Linear(dof+dof+3, 1000),
+          nn.Linear(dof+dof+3, 100),
           nn.Tanh(),
-          nn.Linear(1000, 1000),
+          nn.Linear(100, 100),
           nn.Tanh(),
-          nn.Linear(1000, 1000),
+          nn.Linear(100, 100),
           nn.Tanh(),
-          nn.Linear(1000, dof+7),
+          nn.Linear(100, dof+7),
           nn.Sigmoid()
       ).to(device)
       load_net = True

@@ -14,5 +14,5 @@ max_range: [ 1.5, 1.5,1.5]
 max_tang_speed: 42
 max_distance: 4.3
 
-n_iter: 250000
-database_name: "ssm_dataset_250k"
+n_iter: 1000
+database_name: "ssm_dataset_1k"

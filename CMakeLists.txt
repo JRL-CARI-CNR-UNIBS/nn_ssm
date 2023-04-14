@@ -1,9 +1,9 @@
 cmake_minimum_required(VERSION 3.0.2)
 project(nn_ssm)
-#set(CMAKE_BUILD_TYPE Release)
-set(CMAKE_BUILD_TYPE Debug)
+set(CMAKE_BUILD_TYPE Release)
+#set(CMAKE_BUILD_TYPE Debug)
 
-add_compile_options(-std=c++14)
+add_compile_options(-std=c++17 -funroll-loops -Wall -Ofast)
 
 find_package(catkin REQUIRED COMPONENTS
   roscpp
@@ -51,5 +51,17 @@ target_link_libraries(create_dataset_connection
 add_executable(nn_test src/neural_networks/nn_test.cpp)
 add_dependencies(nn_test ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 target_link_libraries(nn_test
+ ${catkin_LIBRARIES}
+)
+
+add_executable(nn_test_speed src/neural_networks/nn_test_speed.cpp)
+add_dependencies(nn_test_speed ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(nn_test_speed
+ ${catkin_LIBRARIES}
+)
+
+add_executable(compare_speed src/neural_networks/compare_speed.cpp)
+add_dependencies(compare_speed ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(compare_speed
  ${catkin_LIBRARIES}
 )
