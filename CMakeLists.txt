@@ -9,12 +9,13 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
   ssm15066_estimators
+  rt_neural_wrapper
 )
 
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES ${PROJECT_NAME}
-  CATKIN_DEPENDS roscpp rospy ssm15066_estimators
+  CATKIN_DEPENDS roscpp rospy ssm15066_estimators rt_neural_wrapper
   DEPENDS 
 )
 

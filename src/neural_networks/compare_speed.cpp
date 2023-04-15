@@ -9,6 +9,7 @@
 #include <ssm15066_estimators/parallel_ssm15066_estimator2D.h>
 #include <thread-pool/BS_thread_pool.hpp>
 #include <graph_core/informed_sampler.h>
+#include <RTNeural.h>
 
 int main(int argc, char **argv)
 {

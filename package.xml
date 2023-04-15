@@ -18,6 +18,8 @@
   <exec_depend>rospy</exec_depend>
   <exec_depend>ssm15066_estimators</exec_depend>
 
+  <depend>rt_neural_wrapper</depend>
+
   <export>
     <!-- Other tools can request additional information be placed here -->
 
