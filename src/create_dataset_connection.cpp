@@ -521,7 +521,7 @@ int main(int argc, char **argv)
 
   double min_tang_speed = -max_tang_speed;
 
-  assert(max_hr_distance>0.0 && max_tang_speed>0.0);
+  assert(max_hr_distance>0.0 && max_tang_speed>0.0 && max_v_safe>0.0);
 
   double max_scaling = 1000;
   for(Sample& sample:samples)
