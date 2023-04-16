@@ -7,12 +7,12 @@ import matplotlib.pyplot as plt
 
 # Params
 dof = 6
-load_net = True
+load_net = False
 max_scaling = 1000
 fig_name = str(dof)+"dof.png"
 nn_name = "nn_ssm_complete.pt"
 list_dataset_name = ["250k"]
-list_n_epochs = [5000]
+list_n_epochs = [10000]
 list_batch_size = [128]
 lr_vector = [0.001]
 # list_dataset_name = ["1k","10k","25k","50k","75k","100k","125k","150k","200k","250k","500k"]
@@ -25,7 +25,7 @@ loss_fcn = ""
 
 freq_batch = 10
 freq_epoch = 10
-freq_clear_plot = 4000
+freq_clear_plot = 100000
 
 # Get paths
 PATH = os.path.dirname(os.path.abspath(__file__)) + "/data/"
@@ -55,29 +55,18 @@ for d in range(len(list_dataset_name)):
   raw_data = np.fromfile(dataset_path, dtype='float')
   length = raw_data.size
 
-  # parent, child, (x,y,z) of obstacle, dq, min speed, max speed, min dist, max dist, min scaling, max scaling, scaling
-  cols = dof + dof + 3 + dof + 7
+  # parent, child, (x,y,z) of obstacle, dq, v_safe first, v_safe mid, v_safe last, speed first, speed mid, speed last,
+  # dist first, dist mid, dist last, scaling first, scaling mid, scaling last, scaling
+  n_input = dof+dof+3
+  n_output = dof+13
+  cols = n_input + n_output
   rows = int(length/cols)
 
   # from array to multi-dimensional-array
   raw_data = raw_data.reshape(rows, cols)
 
-#   # Transform scalings values
-#   scalings = raw_data[:, -1]  # last column
-#   scalings = np.where(scalings > max_scaling, 0.0, (1.0 /
-#                       scalings))   # scaling between 0.0 and 1.0
-
-  # Create training and validation datasets
-
-  # q, dq, (x,y,z) of obstacle (first, second, last columns excluded)
-#   input = torch.Tensor(raw_data[:, 0:(dof+dof+3)]).reshape(rows,(dof+dof+3))
-#   scalings_tensor = torch.Tensor(scalings).reshape(rows, 1)
-#   speed_tensor = torch.Tensor(raw_data[:,(-dof-1):-1]).reshape(rows, dof)
-
-#   target = torch.cat((speed_tensor,scalings_tensor), -1)
-
-  input = torch.Tensor(raw_data[:, 0:(dof+dof+3)]).reshape(rows,(dof+dof+3))
-  target = torch.Tensor(raw_data[:, (dof+dof+3):]).reshape(rows,(dof+7))
+  input = torch.Tensor(raw_data[:, 0:n_input]).reshape(rows,n_input)
+  target = torch.Tensor(raw_data[:, n_input:]).reshape(rows,n_output)
 
   # random shuffle
   indices = torch.randperm(input.size()[0])
@@ -101,13 +90,15 @@ for d in range(len(list_dataset_name)):
       NN = torch.load(nn_path_shared)
   else:
       NN = nn.Sequential(
-          nn.Linear(dof+dof+3, 100),
+          nn.Linear(n_input, 1000),
           nn.Tanh(),
-          nn.Linear(100, 100),
+          nn.Linear(1000, 1000),
           nn.Tanh(),
-          nn.Linear(100, 100),
+          nn.Linear(1000, 1000),
           nn.Tanh(),
-          nn.Linear(100, dof+7),
+          nn.Linear(1000, 1000),
+          nn.Tanh(),
+          nn.Linear(1000, n_output),
           nn.Sigmoid()
       ).to(device)
       load_net = True
@@ -131,14 +122,19 @@ for d in range(len(list_dataset_name)):
   train_loss_over_epoches = []
 
   plt.rcParams["figure.figsize"] = [12, 15]
-  ax = plt.GridSpec(3, 2)
-  ax.update(wspace=0.5, hspace=0.5)
+  ax = plt.GridSpec(5, 2)
+  ax.update(wspace=1, hspace=1)
 
   ax0 = plt.subplot(ax[0, :])
   ax1 = plt.subplot(ax[1, 0])
   ax2 = plt.subplot(ax[1, 1])
   ax3 = plt.subplot(ax[2, 0])
   ax4 = plt.subplot(ax[2, 1])
+
+  ax5 = plt.subplot(ax[3, 0])
+  ax6 = plt.subplot(ax[3, 1])
+  ax7 = plt.subplot(ax[4, 0])
+  ax8 = plt.subplot(ax[4, 1])
 
   for epoch in range(n_epochs):
       # Training phase
@@ -153,12 +149,6 @@ for d in range(len(list_dataset_name)):
       train_targets = []
       train_output = []
       train_predictions_errors = []
-      train_speed = []
-      train_speed_error = []
-      train_distance = []
-      train_distance_error = []
-      train_target_speed = []
-      train_target_distance = []
 
       for i, batch in enumerate(train_dataloader, 0):  # batches
           # get the inputs -> batch is a list of [inputs, targets]
@@ -206,12 +196,16 @@ for d in range(len(list_dataset_name)):
               val_targets = []
               val_output = []
               val_predictions_errors = []
-              val_speed = []
-              val_speed_error = []
-              val_distance = []
-              val_distance_error = []
-              val_target_speed = []
-              val_target_distance = []
+              
+              val_scaling_mid = []
+              val_speed_mid = []
+              val_dist_mid = []
+              val_v_safe_mid = []
+
+              val_target_scaling_mid = []
+              val_target_speed_mid = []
+              val_target_dist_mid = []
+              val_target_v_safe_mid = []
 
               batches_loss = 0.0
 
@@ -239,6 +233,18 @@ for d in range(len(list_dataset_name)):
                   val_output.extend(predictions[:,-1].detach().cpu().numpy())
                   val_targets.extend(batch_targets[:,-1].detach().cpu().numpy())
                   val_predictions_errors.extend(batch_targets[:,-1].detach().cpu().numpy()-predictions[:,-1].detach().cpu().numpy())
+
+                  val_scaling_mid.extend(predictions[:,-3].detach().cpu().numpy())
+                  val_target_scaling_mid.extend(batch_targets[:,-3].detach().cpu().numpy())
+
+                  val_dist_mid.extend(predictions[:,-6].detach().cpu().numpy())
+                  val_target_dist_mid.extend(batch_targets[:,-6].detach().cpu().numpy())
+
+                  val_speed_mid.extend(predictions[:,-9].detach().cpu().numpy())
+                  val_target_speed_mid.extend(batch_targets[:,-9].detach().cpu().numpy())
+
+                  val_v_safe_mid.extend(predictions[:,-12].detach().cpu().numpy())
+                  val_target_v_safe_mid.extend(batch_targets[:,-12].detach().cpu().numpy())
 
       print("-----------------------------------------------------------")
       # print(f"max err {max(train_predictions_errors)}")
@@ -285,6 +291,30 @@ for d in range(len(list_dataset_name)):
                   title="Target-Prediction")
           ax4.grid(True)
           ax4.plot(train_targets, train_output, '.', color='orange')
+
+          ax5.clear()
+          ax5.set(xlabel="Target", ylabel="Prediction",
+                  title="Speed mid")
+          ax5.grid(True)
+          ax5.plot(val_target_speed_mid, val_speed_mid, '.')
+
+          ax6.clear()
+          ax6.set(xlabel="Target", ylabel="Prediction",
+                  title="Distance mid")
+          ax6.grid(True)
+          ax6.plot(val_target_dist_mid, val_dist_mid, '.')
+          
+          ax7.clear()
+          ax7.set(xlabel="Target", ylabel="Prediction",
+                  title="Scaling mid")
+          ax7.grid(True)
+          ax7.plot(val_target_scaling_mid, val_scaling_mid, '.')
+
+          ax8.clear()
+          ax8.set(xlabel="Target", ylabel="Prediction",
+                  title="V_safe mid")
+          ax8.grid(True)
+          ax8.plot(val_target_v_safe_mid, val_v_safe_mid, '.')
 
           plt.show(block=False)
           plt.draw()

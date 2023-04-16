@@ -37,9 +37,30 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 struct Sample
 {
-  Eigen::VectorXd parent, child, dq;
-  std::vector<std::vector<double>> obstacles;
-  double scaling, min_scaling, max_scaling, distance_min_scaling, distance_max_scaling, speed_min_scaling, speed_max_scaling;
+  //Input
+  Eigen::VectorXd parent, child;
+  std::vector<double> obstacle;
+
+  //Output
+  Eigen::VectorXd dq;
+  double scaling, scaling_first, scaling_mid, scaling_last, speed_first, speed_mid, speed_last, distance_first, distance_mid, distance_last,
+  v_safe_first, v_safe_mid, v_safe_last;
+
+  friend std::ostream& operator<<(std::ostream& os, const Sample& sample)
+  {
+    std::stringstream input, output;
+
+    input<< "\n Input: \n parent -> "<<sample.parent.transpose()<<" child -> "<<sample.child.transpose()
+         <<"\n (x,y,z) obstacle "<<sample.obstacle[0]<<", "<<sample.obstacle[1]<<", "<<sample.obstacle[2];
+
+    output<< "\n Output:\n scaling: "<<sample.scaling<<" scaling first "<<sample.scaling_first<<" scaling mid "<<sample.scaling_mid<<" scaling last "<<sample.scaling_last;
+    output<<"\n speed first "<<sample.speed_first<<" speed mid "<<sample.speed_mid<<" speed last "<<sample.speed_last;
+    output<<"\n dist first "<<sample.distance_first<<" dist mid "<<sample.distance_mid<<" dist last "<<sample.distance_last;
+    output<<"\n v_safe first "<<sample.v_safe_first<<" v_safe mid "<<sample.v_safe_mid<<" v_safe last "<<sample.v_safe_last;
+
+    os<<input.str()<<output.str();
+    return os;
+  }
 };
 
 void random_replace(std::vector<Sample>& v, const Sample& sample)
@@ -168,6 +189,8 @@ int main(int argc, char **argv)
   ssm->setPoiNames(poi_names);
   ssm->updateMembers();
 
+  ssm->setDatasetCreation(true);
+
   // Iterate over samples
   std::random_device rd;
   std::mt19937 gen(rd());
@@ -184,7 +207,6 @@ int main(int argc, char **argv)
       v_scaling_04_05, v_scaling_05_06, v_scaling_06_07, v_scaling_07_08, v_scaling_08_09, v_scaling_09_1;
 
   std::vector<double> obs;
-  std::vector<std::vector<double>> obstacles;
 
   std::vector<int> vectors_fill(12,0);
   size_t n_samples_per_vector = (size_t)std::ceil(n_iter)/12;
@@ -192,20 +214,15 @@ int main(int argc, char **argv)
   while(true && ros::ok())
   {
     // Create obstacle locations
-    obstacles.clear();
     ssm->clearObstaclesPositions();
 
-    for(unsigned int j=0;j<n_objects;j++)
-    {
-      x = dist(gen); obs_location[0] = min_range.at(0)+(max_range.at(0)-min_range.at(0))*x;
-      y = dist(gen); obs_location[1] = min_range.at(1)+(max_range.at(1)-min_range.at(1))*y;
-      z = dist(gen); obs_location[2] = min_range.at(2)+(max_range.at(2)-min_range.at(2))*z;
+    x = dist(gen); obs_location[0] = min_range.at(0)+(max_range.at(0)-min_range.at(0))*x;
+    y = dist(gen); obs_location[1] = min_range.at(1)+(max_range.at(1)-min_range.at(1))*y;
+    z = dist(gen); obs_location[2] = min_range.at(2)+(max_range.at(2)-min_range.at(2))*z;
 
-      ssm->addObstaclePosition(obs_location);
+    ssm->addObstaclePosition(obs_location);
 
-      obs = {x,y,z};
-      obstacles.push_back(obs);
-    }
+    obs = {x,y,z};
 
     // Select a random connection
     parent = sampler->sample();
@@ -232,10 +249,11 @@ int main(int argc, char **argv)
     sample.parent = parent_scaled;
     sample.child = child_scaled;
     sample.dq = dq_scaled;
-    sample.obstacles = obstacles;
-    sample.scaling  = ssm->computeScalingFactor(parent,child); //parent and child, not scaled!
-    sample.min_scaling = ssm->getMinScaling(sample.speed_min_scaling,sample.distance_min_scaling);
-    sample.max_scaling = ssm->getMaxScaling(sample.speed_max_scaling,sample.distance_max_scaling);
+    sample.obstacle = obs;
+    sample.scaling = ssm->computeScalingFactor(parent,child); //parent and child, not scaled!
+    sample.scaling_first = ssm->computeScalingFactorAtQ(parent,dq,sample.speed_first,sample.distance_first,sample.v_safe_first);
+    sample.scaling_mid = ssm->computeScalingFactorAtQ((child+parent)/2.0,dq,sample.speed_mid,sample.distance_mid,sample.v_safe_mid);
+    sample.scaling_last = ssm->computeScalingFactorAtQ(child,dq,sample.speed_last,sample.distance_last,sample.v_safe_last);
 
     // Create a balanced dataset
     if(sample.scaling == 1.0)
@@ -476,17 +494,29 @@ int main(int argc, char **argv)
 
   double max_hr_distance = 0;
   double max_tang_speed = 0;
+  double max_v_safe = 0;
   for(const Sample& sample:samples)
   {
-    if(sample.distance_max_scaling>max_hr_distance)
-      max_hr_distance = sample.distance_max_scaling;
-    if(sample.distance_min_scaling>max_hr_distance)
-      max_hr_distance = sample.distance_min_scaling;
+    if(sample.distance_first>max_hr_distance)
+      max_hr_distance = sample.distance_first;
+    if(sample.distance_mid>max_hr_distance)
+      max_hr_distance = sample.distance_mid;
+    if(sample.distance_last>max_hr_distance)
+      max_hr_distance = sample.distance_last;
 
-    if(sample.speed_max_scaling>max_tang_speed)
-      max_tang_speed = sample.speed_max_scaling;
-    if(sample.speed_min_scaling>max_tang_speed)
-      max_tang_speed = sample.speed_min_scaling;
+    if(std::abs(sample.speed_first)>max_tang_speed)
+      max_tang_speed = std::abs(sample.speed_first);
+    if(std::abs(sample.speed_mid)>max_tang_speed)
+      max_tang_speed = std::abs(sample.speed_mid);
+    if(std::abs(sample.speed_last)>max_tang_speed)
+      max_tang_speed = std::abs(sample.speed_last);
+
+    if(sample.v_safe_first>max_v_safe)
+      max_v_safe = sample.v_safe_first;
+    if(sample.v_safe_mid>max_v_safe)
+      max_v_safe = sample.v_safe_mid;
+    if(sample.v_safe_last>max_v_safe)
+      max_v_safe = sample.v_safe_last;
   }
 
   double min_tang_speed = -max_tang_speed;
@@ -496,31 +526,52 @@ int main(int argc, char **argv)
   double max_scaling = 1000;
   for(Sample& sample:samples)
   {
-    sample.distance_max_scaling = (sample.distance_max_scaling/max_hr_distance);
-    sample.distance_min_scaling = (sample.distance_min_scaling/max_hr_distance);
+    ROS_INFO("------------------------------");
+    ROS_INFO_STREAM("sample: "<<sample);
 
-    sample.speed_max_scaling = ((sample.speed_max_scaling-min_tang_speed)/(max_tang_speed-min_tang_speed));
-    sample.speed_min_scaling = ((sample.speed_min_scaling-min_tang_speed)/(max_tang_speed-min_tang_speed));
+    sample.distance_first = (sample.distance_first/max_hr_distance);
+    sample.distance_mid   = (sample.distance_mid  /max_hr_distance);
+    sample.distance_last  = (sample.distance_last /max_hr_distance);
+
+    sample.speed_first = ((sample.speed_first-min_tang_speed)/(max_tang_speed-min_tang_speed));
+    sample.speed_mid   = ((sample.speed_mid-min_tang_speed  )/(max_tang_speed-min_tang_speed));
+    sample.speed_last  = ((sample.speed_last-min_tang_speed )/(max_tang_speed-min_tang_speed));
+
+    sample.v_safe_first = (sample.v_safe_first/max_v_safe);
+    sample.v_safe_mid   = (sample.v_safe_mid  /max_v_safe);
+    sample.v_safe_last  = (sample.v_safe_last /max_v_safe);
 
     sample.scaling >= max_scaling?
           (sample.scaling = 0.0):
           (sample.scaling = 1.0/sample.scaling);
 
-    sample.min_scaling >= max_scaling?
-          (sample.min_scaling = 0.0):
-          (sample.min_scaling = 1.0/sample.min_scaling);
+    sample.scaling_first >= max_scaling?
+          (sample.scaling_first = 0.0):
+          (sample.scaling_first = 1.0/sample.scaling_first);
 
-    sample.max_scaling >= max_scaling?
-          (sample.max_scaling = 0.0):
-          (sample.max_scaling = 1.0/sample.max_scaling);
+    sample.scaling_mid >= max_scaling?
+          (sample.scaling_mid = 0.0):
+          (sample.scaling_mid = 1.0/sample.scaling_mid);
 
-    assert(sample.scaling             <=1 && sample.scaling             >=0);
-    assert(sample.min_scaling         <=1 && sample.min_scaling         >=0);
-    assert(sample.max_scaling         <=1 && sample.max_scaling         >=0);
-    assert(sample.speed_max_scaling   <=1 && sample.speed_max_scaling   >=0);
-    assert(sample.speed_min_scaling   <=1 && sample.speed_min_scaling   >=0);
-    assert(sample.distance_max_scaling<=1 && sample.distance_max_scaling>=0);
-    assert(sample.distance_min_scaling<=1 && sample.distance_min_scaling>=0);
+    sample.scaling_last >= max_scaling?
+          (sample.scaling_last = 0.0):
+          (sample.scaling_last = 1.0/sample.scaling_last);
+
+    ROS_WARN_STREAM("sample: "<<sample);
+
+    assert(sample.scaling       <=1 && sample.scaling       >=0);
+    assert(sample.scaling_first <=1 && sample.scaling_first >=0);
+    assert(sample.scaling_mid   <=1 && sample.scaling_mid   >=0);
+    assert(sample.scaling_last  <=1 && sample.scaling_last  >=0);
+    assert(sample.speed_first   <=1 && sample.speed_first   >=0);
+    assert(sample.speed_mid     <=1 && sample.speed_mid     >=0);
+    assert(sample.speed_last    <=1 && sample.speed_last    >=0);
+    assert(sample.distance_first<=1 && sample.distance_first>=0);
+    assert(sample.distance_mid  <=1 && sample.distance_mid  >=0);
+    assert(sample.distance_last <=1 && sample.distance_last >=0);
+    assert(sample.v_safe_first  <=1 && sample.v_safe_first  >=0);
+    assert(sample.v_safe_mid    <=1 && sample.v_safe_mid    >=0);
+    assert(sample.v_safe_last   <=1 && sample.v_safe_last   >=0);
   }
 
   std::vector<double> tmp;
@@ -541,9 +592,8 @@ int main(int argc, char **argv)
     Eigen::VectorXd::Map(&tmp[0], sample.child.size()) = sample.child;
     sample_vector.insert(sample_vector.end(),tmp.begin(),tmp.end());
 
-    //obstacles
-    for(const std::vector<double>& obs:sample.obstacles)
-      sample_vector.insert(sample_vector.end(),obs.begin(),obs.end());
+    //obstacle
+    sample_vector.insert(sample_vector.end(),sample.obstacle.begin(),sample.obstacle.end());
 
     //dq
     tmp.clear();
@@ -551,26 +601,28 @@ int main(int argc, char **argv)
     Eigen::VectorXd::Map(&tmp[0], sample.dq.size()) = sample.dq;
     sample_vector.insert(sample_vector.end(),tmp.begin(),tmp.end());
 
-    //min/max speed
-    sample_vector.push_back(sample.speed_min_scaling);
-    sample_vector.push_back(sample.speed_max_scaling);
+    //first/mid/last v_safe
+    sample_vector.push_back(sample.v_safe_first);
+    sample_vector.push_back(sample.v_safe_mid);
+    sample_vector.push_back(sample.v_safe_last);
 
-    //min/max distance
-    sample_vector.push_back(sample.distance_min_scaling);
-    sample_vector.push_back(sample.distance_max_scaling);
+    //first/mid/last speed
+    sample_vector.push_back(sample.speed_first);
+    sample_vector.push_back(sample.speed_mid);
+    sample_vector.push_back(sample.speed_last);
+
+    //first/mid/last distance
+    sample_vector.push_back(sample.distance_first);
+    sample_vector.push_back(sample.distance_mid);
+    sample_vector.push_back(sample.distance_last);
 
     // min/max scaling
-    sample_vector.push_back(sample.min_scaling);
-    sample_vector.push_back(sample.max_scaling);
+    sample_vector.push_back(sample.scaling_first);
+    sample_vector.push_back(sample.scaling_mid);
+    sample_vector.push_back(sample.scaling_last);
 
     // scaling
     sample_vector.push_back(sample.scaling);
-
-    //    std::string txt = "obs: ";
-    //    for(const std::vector<double>& obs:sample.obstacles)
-    //      txt = txt+"("+std::to_string(obs[0])+","+std::to_string(obs[1])+","+std::to_string(obs[2])+") ";
-
-    //    ROS_INFO_STREAM("q: "<<sample.q.transpose()<<" | dq: "<<sample.dq.transpose()<<" | "<<txt+"| scaling: "<<sample.scaling);
 
     file.write((char*)&sample_vector[0], sample_vector.size()*sizeof(double));
   }

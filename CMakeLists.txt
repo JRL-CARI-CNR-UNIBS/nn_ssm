@@ -31,17 +31,17 @@ src/ssm15066_estimators/ssm15066_estimatorNN.cpp
 add_dependencies(${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES})
 
-add_executable(create_dataset src/create_dataset.cpp)
-add_dependencies(create_dataset ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-target_link_libraries(create_dataset
- ${catkin_LIBRARIES}
-)
+#add_executable(create_dataset src/create_dataset.cpp)
+#add_dependencies(create_dataset ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+#target_link_libraries(create_dataset
+# ${catkin_LIBRARIES}
+#)
 
-add_executable(create_dataset2 src/create_dataset2.cpp)
-add_dependencies(create_dataset2 ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-target_link_libraries(create_dataset2
- ${catkin_LIBRARIES}
-)
+#add_executable(create_dataset2 src/create_dataset2.cpp)
+#add_dependencies(create_dataset2 ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+#target_link_libraries(create_dataset2
+# ${catkin_LIBRARIES}
+#)
 
 add_executable(create_dataset_connection src/create_dataset_connection.cpp)
 add_dependencies(create_dataset_connection ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
