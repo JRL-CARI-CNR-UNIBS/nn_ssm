@@ -99,6 +99,9 @@ for d in range(len(list_dataset_name)):
           nn.Linear(1000, 1000),
           nn.Tanh(),
           nn.Dropout(0.15),
+          nn.Linear(1000, 1000),
+          nn.Tanh(),
+          nn.Dropout(0.15),
           nn.Linear(1000, n_output),
           nn.Sigmoid()
       ).to(device)
