@@ -11,10 +11,10 @@ load_net = False
 max_scaling = 1000
 fig_name = str(dof)+"dof.png"
 nn_name = "nn_ssm_complete.pt"
-list_dataset_name = ["50k","100k","250k"]
-list_n_epochs = [10000,10000,10000]
-list_batch_size = [256,256,256]
-lr_vector = [0.001,0.001]
+list_dataset_name = ["10k","50k","100k","250k"]
+list_n_epochs = [10000,10000,10000,10000]
+list_batch_size = [128,256,256,512]
+lr_vector = [0.001,0.001,0.001,0.001]
 # list_dataset_name = ["1k","10k","25k","50k","75k","100k","125k","150k","200k","250k","500k"]
 # list_n_epochs = [1000,2000,2000,3000,3000,3000,3000,3000,3000,3000,3000]
 # list_batch_size = [64,64,64,128,128,264,264,264,328,328,328]
@@ -90,18 +90,18 @@ for d in range(len(list_dataset_name)):
       NN = torch.load(nn_path_shared)
   else:
       NN = nn.Sequential(
-          nn.Linear(n_input, 1000),
+          nn.Linear(n_input, 4000),
           nn.Tanh(),
-          nn.Dropout(0.15),
-          nn.Linear(1000, 1000),
+          nn.Dropout(0.05),
+          nn.Linear(4000, 3000),
           nn.Tanh(),
-          nn.Dropout(0.15),
-          nn.Linear(1000, 1000),
+          nn.Dropout(0.05),
+          nn.Linear(3000, 2000),
           nn.Tanh(),
-          nn.Dropout(0.15),
-          nn.Linear(1000, 1000),
+          nn.Dropout(0.05),
+          nn.Linear(2000, 1000),
           nn.Tanh(),
-          nn.Dropout(0.15),
+          nn.Dropout(0.05),
           nn.Linear(1000, n_output),
           nn.Sigmoid()
       ).to(device)
@@ -112,7 +112,7 @@ for d in range(len(list_dataset_name)):
   # Define loss function and optimizer
 
   if loss_fcn == "L1":
-      criterion = torch.nn.L1Loss(reduction='sum')
+      criterion = torch.nn.L1Loss()
   else:
       criterion = torch.nn.MSELoss()
 
@@ -168,16 +168,13 @@ for d in range(len(list_dataset_name)):
           predictions = NN(batch_input)
 
           # backpropagation
-          loss = criterion(predictions, batch_targets)
+          loss = criterion(predictions**3, batch_targets**3)
           loss.backward()
 
           optimizer.step()
 
           # print current performance
-          if loss_fcn == "L1":
-              train_loss_per_epoch += loss.item()
-          else:
-              train_loss_per_epoch += (loss.item()*batch_targets.size()[0])
+          train_loss_per_epoch += (loss.item()*batch_targets.size()[0])
 
           batches_loss += loss.item()
           if i % freq_batch == freq_batch-1:    # print every freq_batch mini-batches
@@ -221,12 +218,9 @@ for d in range(len(list_dataset_name)):
                   batch_targets = batch_targets.to(device)
 
                   predictions = NN(batch_input)
-                  loss = criterion(predictions, batch_targets)
+                  loss = criterion(predictions**3, batch_targets**3)
 
-                  if loss_fcn == "L1":
-                      val_loss_per_epoch += loss.item()
-                  else:
-                      val_loss_per_epoch += (loss.item()*batch_targets.size()[0])
+                  val_loss_per_epoch += (loss.item()*batch_targets.size()[0])
 
                   batches_loss += loss.item()
                   if i % freq_batch == freq_batch-1:    # print every 1000 mini-batches

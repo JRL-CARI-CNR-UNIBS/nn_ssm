@@ -54,13 +54,46 @@ typedef std::shared_ptr<SSM15066EstimatorNN> SSM15066EstimatorNNPtr;
 class SSM15066EstimatorNN: public SSM15066Estimator2D
 {
 protected:
+  /**
+   * @brief nn_ neural network model
+   */
   neural_network::NeuralNetworkPtr nn_;
+
+  /**
+   * @brief lb_ and inv_q_limits_ lower bounds and inverse of the joints limits. It is used to scale the inputs
+   */
+  Eigen::VectorXd lb_;
+  Eigen::VectorXd inv_q_limits_;
+
+  /**
+   * @brief obs_min_range_ and obs_max_range_ defines the min and max obstacle location range, obs_inv_range_ is the inverse of their difference.
+   *  It is used to scale the inputs
+   */
+  Eigen::Vector3d obs_min_range_;
+  Eigen::Vector3d obs_max_range_;
+  Eigen::Vector3d obs_inv_range_;
+
+  /**
+   * @brief init sets class members
+   */
+  void init();
+
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-  SSM15066EstimatorNN(const rosdyn::ChainPtr &chain, const neural_network::NeuralNetworkPtr& nn);
   SSM15066EstimatorNN(const rosdyn::ChainPtr &chain, const neural_network::NeuralNetworkPtr& nn,
-                      const Eigen::Matrix<double,3,Eigen::Dynamic>& obstacles_positions);
+                      const Eigen::Vector3d& obs_min_range, const Eigen::Vector3d& obs_max_range);
+  SSM15066EstimatorNN(const rosdyn::ChainPtr &chain, const neural_network::NeuralNetworkPtr& nn,
+                      const Eigen::Matrix<double,3,Eigen::Dynamic>& obstacles_positions,
+                      const Eigen::Vector3d& obs_min_range, const Eigen::Vector3d& obs_max_range);
 
+  void setObsRange(const Eigen::Vector3d& obs_min_range, const Eigen::Vector3d& obs_max_range)
+  {
+    obs_min_range_ = obs_min_range;
+    obs_max_range_ = obs_max_range;
+  }
+
+  void setObstaclesPositions(const Eigen::Matrix<double,3,Eigen::Dynamic>& obstacles_positions) override;
+  void addObstaclePosition(const Eigen::Vector3d& obstacle_position) override;
 
   virtual double computeScalingFactor(const Eigen::VectorXd& q1, const Eigen::VectorXd& q2) override;
   virtual pathplan::CostPenaltyPtr clone() override;

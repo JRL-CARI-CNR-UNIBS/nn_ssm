@@ -8,7 +8,7 @@ import yaml
 from torch.nn.utils import parameters_to_vector
 
 # Params
-nn_name = "nn_ssm_complete.pt"
+nn_name = "nn_test_performance.pt"
 namespace = "ssm_nn"
 
 PATH = os.path.dirname(os.path.abspath(__file__)) + "/data/"
@@ -40,11 +40,13 @@ for layer in NN.children():
         nn_dict[last_key].update({"activation": "tanh"})
     elif isinstance(layer, nn.Sigmoid):
         nn_dict[last_key].update({"activation": "sigmoid"})
+    elif isinstance(layer, nn.Dropout):
+        pass
     else:
         raise Exception("Sorry, layer type not implemente yet")
 
 dict = {namespace: nn_dict}
 
-with open(PATH+"MODEL.yaml", 'w') as f:
+with open(PATH+"MODEL_test_performance.yaml", 'w') as f:
     yaml.dump(dict, f)   
 

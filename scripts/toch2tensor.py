@@ -11,6 +11,7 @@ from onnx_tf.backend import prepare
 from model_utils import save_model
 import numpy as np
 import tensorflow as tf
+import keras
 
 device = "cpu"
 nn_name = "nn_torch2tensor.pt"
@@ -52,12 +53,4 @@ onnx.checker.check_model(onnx_model)
 tf_rep = prepare(onnx_model)
 tf_rep.export_graph(tf_path)
 
-# with tf.gfile.FastGFile(tf_path, 'rb') as f:
-#     graph_def = tf.GraphDef()
-#     graph_def.ParseFromString(f.read())
- 
-# with tf.Graph().as_default() as graph:
-#     tf.import_graph_def(graph_def, name="")
-
-
-save_model(tf_rep, PATH+'model_weights.json')
+# save_model(model_tmp, PATH+'model_weights.json')

@@ -34,10 +34,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace neural_network{
 
 using data_type = double;
-//typedef Eigen::Matrix<data_type, Eigen::Dynamic, Eigen::Dynamic> MatrixXn;
-//typedef Eigen::Matrix<data_type, Eigen::Dynamic, 1> VectorXn;
-typedef Eigen::MatrixXd MatrixXn;
-typedef Eigen::VectorXd VectorXn;
+typedef Eigen::Matrix<data_type, Eigen::Dynamic, Eigen::Dynamic> MatrixXn;
+typedef Eigen::Matrix<data_type, Eigen::Dynamic, 1> VectorXn;
+//typedef Eigen::MatrixXd MatrixXn;
+//typedef Eigen::VectorXd VectorXn;
 
 class NeuralNetwork;
 typedef std::shared_ptr<NeuralNetwork> NeuralNetworkPtr;
@@ -253,6 +253,10 @@ public:
       // | weight11 weight12 weight13 .. |*|sample11 sample21 .. |    weights -> each row is associated to a neuron
       // | weight21 weight22 weight23 .. | |sample12 sample22 .. |    samples -> each col is a sample
       //                                   |sample13 sample23 .. |
+
+      inputs = ((weights_[layer]*inputs).colwise() + bias_[layer]).unaryExpr(activations_[layer]);
+
+
 //      tic_init = ros::WallTime::now();
 
 //      tic = ros::WallTime::now();
@@ -271,7 +275,6 @@ public:
 
 //      ROS_INFO_STREAM("time1 "<<(time1/time)*100<<" time2 "<<(time2/time)*100<<" time3 "<<(time3/time)*100);
 
-      inputs = ((weights_[layer]*inputs).colwise() + bias_[layer]).unaryExpr(activations_[layer]);
     }
 
     return inputs;
@@ -281,15 +284,6 @@ public:
   {
     return std::make_shared<neural_network::NeuralNetwork>(topology_,weights_,bias_,activations_);
   }
-
-  // storage objects for working of neural network
-  /*
-    use pointers when using std::vector<Class> as std::vector<Class> calls destructor of
-    Class as soon as it is pushed back! when we use pointers it can't do that, besides
-    it also makes our neural network class less heavy!! It would be nice if you can use
-    smart pointers instead of usual ones like this
-    */
-
 };
 }
 
