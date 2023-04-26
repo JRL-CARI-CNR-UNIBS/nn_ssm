@@ -11,14 +11,16 @@ load_net = False
 max_scaling = 1000
 fig_name = str(dof)+"dof.png"
 nn_name = "nn_ssm_complete.pt"
+
+list_dataset_name = ["10k"]
+list_n_epochs = [5000]
+list_batch_size = [32]
+lr_vector = [0.001]
+
 list_dataset_name = ["10k","50k","100k","250k"]
-list_n_epochs = [10000,10000,10000,10000]
-list_batch_size = [128,256,256,512]
+list_n_epochs = [1000,3000,3000,10000]
+list_batch_size = [32,32,64,128]
 lr_vector = [0.001,0.001,0.001,0.001]
-# list_dataset_name = ["1k","10k","25k","50k","75k","100k","125k","150k","200k","250k","500k"]
-# list_n_epochs = [1000,2000,2000,3000,3000,3000,3000,3000,3000,3000,3000]
-# list_batch_size = [64,64,64,128,128,264,264,264,328,328,328]
-# lr_vector = [0.001,0.001,0.001,0.001,0.001,0.001,0.001,0.001,0.001,0.001,0.001,0.001,]
 
 perc_train = 0.8
 loss_fcn = ""
@@ -55,10 +57,11 @@ for d in range(len(list_dataset_name)):
   raw_data = np.fromfile(dataset_path, dtype='float')
   length = raw_data.size
 
-  # parent, child, (x,y,z) of obstacle, dq, v_safe first, v_safe mid, v_safe last, speed first, speed mid, speed last,
+  # Input: parent, child, (x,y,z) of obstacle,
+  # Output: length, poi_first, poi_mid, poi_last, dq, v_safe first, v_safe mid, v_safe last, speed first, speed mid, speed last,
   # dist first, dist mid, dist last, scaling first, scaling mid, scaling last, scaling
   n_input = dof+dof+3
-  n_output = dof+13
+  n_output = 1+3*3+dof+13
   cols = n_input + n_output
   rows = int(length/cols)
 
@@ -89,23 +92,70 @@ for d in range(len(list_dataset_name)):
   if load_net:
       NN = torch.load(nn_path_shared)
   else:
-      NN = nn.Sequential(
-          nn.Linear(n_input, 4000),
-          nn.Tanh(),
-          nn.Dropout(0.05),
-          nn.Linear(4000, 3000),
-          nn.Tanh(),
-          nn.Dropout(0.05),
-          nn.Linear(3000, 2000),
-          nn.Tanh(),
-          nn.Dropout(0.05),
-          nn.Linear(2000, 1000),
-          nn.Tanh(),
-          nn.Dropout(0.05),
-          nn.Linear(1000, n_output),
-          nn.Sigmoid()
-      ).to(device)
-      load_net = True
+    NN = nn.Sequential(
+    nn.Linear(n_input, 1000),
+    nn.Tanh(),
+    nn.Linear(1000, n_output),
+    nn.Sigmoid()
+    ).to(device)
+    load_net = True
+     
+    # NN = nn.Sequential(
+    # nn.Linear(n_input, 1500),
+    # nn.Tanh(),
+    # nn.Dropout(0.5),
+    # nn.Linear(1500, 1500),
+    # nn.Tanh(),
+    # nn.Dropout(0.3),
+    # nn.Linear(1500, n_output),
+    # nn.Sigmoid()
+    # ).to(device)
+    # load_net = True
+
+    #         NN = nn.Sequential(
+    #       nn.Linear(n_input, 1000),
+    #       nn.Tanh(),
+    #       nn.Dropout(0.1),
+    #       nn.Linear(1000, 500),
+    #       nn.Tanh(),
+    #       nn.Dropout(0.01),
+    #       nn.Linear(500, n_output),
+    #       nn.Sigmoid()
+    #   ).to(device)
+
+    #       NN = nn.Sequential(
+    #       nn.Linear(n_input, 4000),
+    #       nn.Tanh(),
+    #       nn.Dropout(0.05),
+    #       nn.Linear(4000, 3000),
+    #       nn.Tanh(),
+    #       nn.Dropout(0.05),
+    #       nn.Linear(3000, 2000),
+    #       nn.Tanh(),
+    #       nn.Dropout(0.05),
+    #       nn.Linear(2000, 1000),
+    #       nn.Tanh(),
+    #       nn.Dropout(0.05),
+    #       nn.Linear(1000, n_output),
+    #       nn.Sigmoid()
+    #   ).to(device)
+    #   load_net = True
+
+    #   NN = nn.Sequential(
+    #   nn.Linear(n_input, 7000),
+    #   nn.Tanh(),
+    #   nn.Dropout(0.1),
+    #   nn.Linear(7000, 3000),
+    #   nn.Tanh(),
+    #   nn.Dropout(0.05),
+    #   nn.Linear(3000, 1000),
+    #   nn.Tanh(),
+    #   nn.Dropout(0.01),
+    #   nn.Linear(1000, 100),
+    #   nn.Tanh(),
+    #   nn.Linear(100, n_output),
+    #   nn.Sigmoid()
+    # ).to(device)
 
   print(NN)
 
@@ -116,7 +166,8 @@ for d in range(len(list_dataset_name)):
   else:
       criterion = torch.nn.MSELoss()
 
-  optimizer = optim.Adam(NN.parameters(), lr=lr, amsgrad=True)
+  optimizer = optim.Adam(NN.parameters(), lr=lr)
+#   optimizer = optim.Adam(NN.parameters(), lr=lr, amsgrad=True)
   # optimizer = optim.SGD(NN.parameters(), lr=lr, momentum=0.7)
 
   # Train & Validation
@@ -126,8 +177,8 @@ for d in range(len(list_dataset_name)):
   train_loss_over_epoches = []
 
   plt.rcParams["figure.figsize"] = [12, 15]
-  ax = plt.GridSpec(5, 2)
-  ax.update(wspace=1, hspace=1)
+  ax = plt.GridSpec(7, 2)
+  ax.update(wspace=1, hspace=1.5)
 
   ax0 = plt.subplot(ax[0, :])
   ax1 = plt.subplot(ax[1, 0])
@@ -139,6 +190,11 @@ for d in range(len(list_dataset_name)):
   ax6 = plt.subplot(ax[3, 1])
   ax7 = plt.subplot(ax[4, 0])
   ax8 = plt.subplot(ax[4, 1])
+
+  ax9  = plt.subplot(ax[5, 0])
+  ax10 = plt.subplot(ax[5, 1])
+  ax11 = plt.subplot(ax[6, 0])
+  ax12 = plt.subplot(ax[6, 1])
 
   for epoch in range(n_epochs):
       # Training phase
@@ -168,6 +224,7 @@ for d in range(len(list_dataset_name)):
           predictions = NN(batch_input)
 
           # backpropagation
+        #   loss = criterion(predictions, batch_targets)
           loss = criterion(predictions**3, batch_targets**3)
           loss.backward()
 
@@ -202,11 +259,20 @@ for d in range(len(list_dataset_name)):
               val_speed_mid = []
               val_dist_mid = []
               val_v_safe_mid = []
+              val_length =  []
+              val_poi_x =  []
+              val_poi_y =  []
+              val_poi_z =  []
 
               val_target_scaling_mid = []
               val_target_speed_mid = []
               val_target_dist_mid = []
               val_target_v_safe_mid = []
+
+              val_target_length =  []
+              val_target_poi_x =  []
+              val_target_poi_y =  []
+              val_target_poi_z =  []
 
               batches_loss = 0.0
 
@@ -218,6 +284,7 @@ for d in range(len(list_dataset_name)):
                   batch_targets = batch_targets.to(device)
 
                   predictions = NN(batch_input)
+                #   loss = criterion(predictions, batch_targets)
                   loss = criterion(predictions**3, batch_targets**3)
 
                   val_loss_per_epoch += (loss.item()*batch_targets.size()[0])
@@ -244,6 +311,19 @@ for d in range(len(list_dataset_name)):
                   val_v_safe_mid.extend(predictions[:,-12].detach().cpu().numpy())
                   val_target_v_safe_mid.extend(batch_targets[:,-12].detach().cpu().numpy())
 
+                  val_length.extend(predictions[:,-29].detach().cpu().numpy())
+                  val_target_length.extend(batch_targets[:,-29].detach().cpu().numpy())
+
+                  val_poi_x.extend(predictions[:,-25].detach().cpu().numpy())
+                  val_target_poi_x.extend(batch_targets[:,-25].detach().cpu().numpy())
+
+                  val_poi_y.extend(predictions[:,-24].detach().cpu().numpy())
+                  val_target_poi_y.extend(batch_targets[:,-24].detach().cpu().numpy())
+
+                  val_poi_z.extend(predictions[:,-23].detach().cpu().numpy())
+                  val_target_poi_z.extend(batch_targets[:,-23].detach().cpu().numpy())
+
+
       print("-----------------------------------------------------------")
       # print(f"max err {max(train_predictions_errors)}")
 
@@ -260,7 +340,7 @@ for d in range(len(list_dataset_name)):
           ax0.clear()
           txt = "Epoches (x "+str(freq_epoch)+")"
           ax0.set(xlabel=txt, ylabel="Loss",
-                  title="Training and Validation Loss")
+                  title="Training ("+str(train_loss_over_epoches[-1])+") and Validation Loss ("+str(val_loss_over_epoches[-1])+")")
           ax0.grid(True)
           ax0.plot(val_loss_over_epoches)
           ax0.plot(train_loss_over_epoches)
@@ -313,6 +393,30 @@ for d in range(len(list_dataset_name)):
                   title="V_safe mid")
           ax8.grid(True)
           ax8.plot(val_target_v_safe_mid, val_v_safe_mid, '.')
+
+          ax9.clear()
+          ax9.set(xlabel="Target", ylabel="Prediction",
+                  title="Length")
+          ax9.grid(True)
+          ax9.plot(val_target_length, val_length, '.')
+
+          ax10.clear()
+          ax10.set(xlabel="Target", ylabel="Prediction",
+                  title="Poi X mid")
+          ax10.grid(True)
+          ax10.plot(val_target_poi_x, val_poi_x, '.')
+
+          ax11.clear()
+          ax11.set(xlabel="Target", ylabel="Prediction",
+                  title="Poi Y mid")
+          ax11.grid(True)
+          ax11.plot(val_target_poi_y, val_poi_y, '.')
+
+          ax12.clear()
+          ax12.set(xlabel="Target", ylabel="Prediction",
+                  title="Poi Z mid")
+          ax12.grid(True)
+          ax12.plot(val_target_poi_z, val_poi_z, '.')
 
           plt.show(block=False)
           plt.draw()

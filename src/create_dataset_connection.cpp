@@ -23,7 +23,6 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-
 #include <graph_core/informed_sampler.h>
 #include <ssm15066_estimators/ssm15066_estimator2D.h>
 #include <moveit/move_group_interface/move_group_interface.h>
@@ -43,20 +42,23 @@ struct Sample
 
   //Output
   Eigen::VectorXd dq;
-  double scaling, scaling_first, scaling_mid, scaling_last, speed_first, speed_mid, speed_last, distance_first, distance_mid, distance_last,
-  v_safe_first, v_safe_mid, v_safe_last;
+  Eigen::Vector3d poi_position_first, poi_position_mid, poi_position_last;
+  double scaling, scaling_first, scaling_mid, scaling_last, speed_first, speed_mid, speed_last,
+  distance_first, distance_mid, distance_last, v_safe_first, v_safe_mid, v_safe_last, length;
 
   friend std::ostream& operator<<(std::ostream& os, const Sample& sample)
   {
     std::stringstream input, output;
 
-    input<< "\n Input: \n parent -> "<<sample.parent.transpose()<<" child -> "<<sample.child.transpose()
-         <<"\n (x,y,z) obstacle "<<sample.obstacle[0]<<", "<<sample.obstacle[1]<<", "<<sample.obstacle[2];
+    input<< "\n Input: \n parent "<<sample.parent.transpose()<<" | child "<<sample.child.transpose()
+         <<"\n (x,y,z) obstacle "<<sample.obstacle[0]<<" "<<sample.obstacle[1]<<" "<<sample.obstacle[2];
 
-    output<< "\n Output:\n scaling: "<<sample.scaling<<" scaling first "<<sample.scaling_first<<" scaling mid "<<sample.scaling_mid<<" scaling last "<<sample.scaling_last;
-    output<<"\n speed first "<<sample.speed_first<<" speed mid "<<sample.speed_mid<<" speed last "<<sample.speed_last;
-    output<<"\n dist first "<<sample.distance_first<<" dist mid "<<sample.distance_mid<<" dist last "<<sample.distance_last;
-    output<<"\n v_safe first "<<sample.v_safe_first<<" v_safe mid "<<sample.v_safe_mid<<" v_safe last "<<sample.v_safe_last;
+    output<< "\n Output:\n scaling: "<<sample.scaling<<" | scaling first "<<sample.scaling_first<<" | scaling mid "<<sample.scaling_mid<<" | scaling last "<<sample.scaling_last;
+    output<<"\n speed first "<<sample.speed_first<<" | speed mid "<<sample.speed_mid<<" | speed last "<<sample.speed_last;
+    output<<"\n dist first "<<sample.distance_first<<" | dist mid "<<sample.distance_mid<<" | dist last "<<sample.distance_last;
+    output<<"\n v_safe first "<<sample.v_safe_first<<" | v_safe mid "<<sample.v_safe_mid<<" | v_safe last "<<sample.v_safe_last;
+    output<<"\n poi_position first "<<sample.poi_position_first.transpose()<<" | poi_position mid "<<sample.poi_position_mid.transpose()<<" | poi_position last "<<sample.poi_position_last.transpose();
+    output<<"\n length scaled "<<sample.length<<" | dq "<<sample.dq.transpose();
 
     os<<input.str()<<output.str();
     return os;
@@ -127,6 +129,8 @@ int main(int argc, char **argv)
   std::vector<double> max_range;
   nh.getParam("max_range",max_range);
 
+  database_name = database_name+"_"+std::to_string(int(n_iter/1000.0))+"k";
+
   ros::ServiceClient ps_client=nh.serviceClient<moveit_msgs::GetPlanningScene>("/get_planning_scene");
 
   // Create manipulator model, chain and ssm module
@@ -170,7 +174,6 @@ int main(int argc, char **argv)
   }
 
   pathplan::CollisionCheckerPtr checker = std::make_shared<pathplan::ParallelMoveitCollisionChecker>(planning_scene, group_name, 5, 0.005);
-
   pathplan::SamplerPtr sampler = std::make_shared<pathplan::InformedSampler>(lb, ub, lb, ub);
 
   Eigen::Vector3d grav; grav << 0, 0, -9.806;
@@ -181,7 +184,17 @@ int main(int argc, char **argv)
   Eigen::VectorXd inv_q_limits = (ub-lb).cwiseInverse();
   Eigen::VectorXd inv_speed_limits = (max_speed-min_speed).cwiseInverse();
 
-  ssm15066_estimator::SSM15066Estimator2DPtr ssm = std::make_shared<ssm15066_estimator::SSM15066Estimator2D>(chain,0.001);
+  // Iterate over samples
+  std::random_device rd;
+  std::mt19937 gen(rd());
+  std::uniform_real_distribution<double> dist(0.0, 1.0);
+
+  double max_conn_length = 1.0;
+  double min_conn_length = 0.001;
+
+  std::uniform_real_distribution<double> conn_length_dist(min_conn_length, max_conn_length);
+
+  ssm15066_estimator::SSM15066Estimator2DPtr ssm = std::make_shared<ssm15066_estimator::SSM15066Estimator2D>(chain,min_conn_length);
   ssm->setMaxCartAcc(max_cart_acc,false);
   ssm->setReactionTime(t_r,false);
   ssm->setMinDistance(min_safe_distance,false);
@@ -191,12 +204,7 @@ int main(int argc, char **argv)
 
   ssm->setDatasetCreation(true);
 
-  // Iterate over samples
-  std::random_device rd;
-  std::mt19937 gen(rd());
-  std::uniform_real_distribution<double> dist(0.0, 1.0);
-
-  std::cout<<"Database creation starts"<<std::endl;
+  std::cout<<"Database "<<database_name<<" creation starts"<<std::endl;
   ros::Duration(5).sleep();
 
   double x, y, z, slowest_joint_time;
@@ -228,10 +236,10 @@ int main(int argc, char **argv)
     parent = sampler->sample();
     child  = sampler->sample();
 
-    if((parent-child).norm()>1.0)
-      child = parent+(child-parent)*dist(gen);
-
+    child = parent+((child-parent)/(child-parent).norm())*conn_length_dist(gen);
     connection = (child-parent);
+
+    assert(connection.norm()<=max_conn_length && connection.norm()>=min_conn_length);
 
     if(not checker->checkPath(parent,child))
       continue;
@@ -245,15 +253,29 @@ int main(int argc, char **argv)
 
     dq_scaled = (inv_speed_limits).cwiseProduct(dq-min_speed);
 
+    for(uint d=0;d<dq_scaled.size();d++) //fix numerical errors
+    {
+      if(std::abs(dq_scaled[d])<1e-08)
+        dq_scaled[d] = 0.0;
+
+      if(std::abs(dq_scaled[d]-1.0)<1e-08)
+        dq_scaled[d] = 1.0;
+    }
+
     Sample sample;
     sample.parent = parent_scaled;
     sample.child = child_scaled;
     sample.dq = dq_scaled;
     sample.obstacle = obs;
+    sample.length = (connection.norm()-min_conn_length)/(max_conn_length-min_conn_length);
+
     sample.scaling = ssm->computeScalingFactor(parent,child); //parent and child, not scaled!
-    sample.scaling_first = ssm->computeScalingFactorAtQ(parent,dq,sample.speed_first,sample.distance_first,sample.v_safe_first);
-    sample.scaling_mid = ssm->computeScalingFactorAtQ((child+parent)/2.0,dq,sample.speed_mid,sample.distance_mid,sample.v_safe_mid);
-    sample.scaling_last = ssm->computeScalingFactorAtQ(child,dq,sample.speed_last,sample.distance_last,sample.v_safe_last);
+    sample.scaling_first = ssm->computeScalingFactorAtQ(parent,dq,sample.speed_first,sample.distance_first,
+                                                        sample.v_safe_first, sample.poi_position_first);
+    sample.scaling_mid = ssm->computeScalingFactorAtQ((child+parent)/2.0,dq,sample.speed_mid,sample.distance_mid,
+                                                      sample.v_safe_mid,sample.poi_position_mid);
+    sample.scaling_last = ssm->computeScalingFactorAtQ(child,dq,sample.speed_last,sample.distance_last,
+                                                       sample.v_safe_last,sample.poi_position_last);
 
     // Create a balanced dataset
     if(sample.scaling == 1.0)
@@ -495,6 +517,9 @@ int main(int argc, char **argv)
   double max_hr_distance = 0;
   double max_tang_speed = 0;
   double max_v_safe = 0;
+  Eigen::Vector3d min_poi_position, max_poi_position;
+  max_poi_position<<0.0,0.0,0.0;
+
   for(const Sample& sample:samples)
   {
     if(sample.distance_first>max_hr_distance)
@@ -517,10 +542,24 @@ int main(int argc, char **argv)
       max_v_safe = sample.v_safe_mid;
     if(sample.v_safe_last>max_v_safe)
       max_v_safe = sample.v_safe_last;
+
+    for(uint d=0;d<sample.poi_position_first.size();d++)
+    {
+      if(std::abs(sample.poi_position_first[d])>max_poi_position[d])
+        max_poi_position[d] = std::abs(sample.poi_position_first[d]);
+      if(std::abs(sample.poi_position_mid[d])>max_poi_position[d])
+        max_poi_position[d] = std::abs(sample.poi_position_mid[d]);
+      if(std::abs(sample.poi_position_last[d])>max_poi_position[d])
+        max_poi_position[d] = std::abs(sample.poi_position_last[d]);
+    }
   }
 
-  double min_tang_speed = -max_tang_speed;
+  min_poi_position = -max_poi_position;
+  min_poi_position[2] = 0.0; //z lower bound is 0.0
 
+  Eigen::Vector3d inv_poi_range = (max_poi_position-min_poi_position).cwiseInverse();
+
+  double min_tang_speed = -max_tang_speed;
   assert(max_hr_distance>0.0 && max_tang_speed>0.0 && max_v_safe>0.0);
 
   double max_scaling = 1000;
@@ -528,6 +567,10 @@ int main(int argc, char **argv)
   {
     ROS_INFO("------------------------------");
     ROS_INFO_STREAM("sample: "<<sample);
+
+    sample.poi_position_first = inv_poi_range.cwiseProduct(sample.poi_position_first-min_poi_position);
+    sample.poi_position_mid   = inv_poi_range.cwiseProduct(sample.poi_position_mid  -min_poi_position);
+    sample.poi_position_last  = inv_poi_range.cwiseProduct(sample.poi_position_last -min_poi_position);
 
     sample.distance_first = (sample.distance_first/max_hr_distance);
     sample.distance_mid   = (sample.distance_mid  /max_hr_distance);
@@ -572,6 +615,29 @@ int main(int argc, char **argv)
     assert(sample.v_safe_first  <=1 && sample.v_safe_first  >=0);
     assert(sample.v_safe_mid    <=1 && sample.v_safe_mid    >=0);
     assert(sample.v_safe_last   <=1 && sample.v_safe_last   >=0);
+    assert(sample.length        <=1 && sample.length        >=0);
+
+    assert([&]() ->bool{
+             for(uint d=0;d<sample.dq.size();d++)
+             {
+               if(sample.dq[d]>1.0 || sample.dq[d]<0.0)
+               return false;
+             }
+             return true;
+           }());
+
+    assert([&]() ->bool{
+             for(uint d=0;d<sample.poi_position_first.size();d++)
+             {
+               if(sample.poi_position_first[d]>1.0 || sample.poi_position_first[d]<0.0)
+               return false;
+               if(sample.poi_position_mid[d]>1.0 || sample.poi_position_mid[d]<0.0)
+               return false;
+               if(sample.poi_position_last[d]>1.0 || sample.poi_position_last[d]<0.0)
+               return false;
+             }
+             return true;
+           }());
   }
 
   std::vector<double> tmp;
@@ -594,6 +660,25 @@ int main(int argc, char **argv)
 
     //obstacle
     sample_vector.insert(sample_vector.end(),sample.obstacle.begin(),sample.obstacle.end());
+
+    //length
+    sample_vector.push_back(sample.length);
+
+    //first/mid/last poi_position
+    tmp.clear();
+    tmp.resize(sample.poi_position_first.size());
+    Eigen::VectorXd::Map(&tmp[0], sample.poi_position_first.size()) = sample.poi_position_first;
+    sample_vector.insert(sample_vector.end(),tmp.begin(),tmp.end());
+
+    tmp.clear();
+    tmp.resize(sample.poi_position_mid.size());
+    Eigen::VectorXd::Map(&tmp[0], sample.poi_position_mid.size()) = sample.poi_position_mid;
+    sample_vector.insert(sample_vector.end(),tmp.begin(),tmp.end());
+
+    tmp.clear();
+    tmp.resize(sample.poi_position_last.size());
+    Eigen::VectorXd::Map(&tmp[0], sample.poi_position_last.size()) = sample.poi_position_last;
+    sample_vector.insert(sample_vector.end(),tmp.begin(),tmp.end());
 
     //dq
     tmp.clear();
