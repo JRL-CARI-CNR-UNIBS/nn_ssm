@@ -17,10 +17,10 @@ list_n_epochs = [5000]
 list_batch_size = [32]
 lr_vector = [0.001]
 
-list_dataset_name = ["10k","50k","100k","250k"]
-list_n_epochs = [1000,3000,3000,10000]
-list_batch_size = [32,32,64,128]
-lr_vector = [0.001,0.001,0.001,0.001]
+list_dataset_name = ["10k","500k","100k","250k"]
+list_n_epochs = [5000,10000]
+list_batch_size = [32,64]
+lr_vector = [0.001,0.001]
 
 perc_train = 0.8
 loss_fcn = ""
