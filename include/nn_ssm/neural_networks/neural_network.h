@@ -26,18 +26,21 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+#define EIGEN_RUNTIME_NO_MALLOC
+#define EIGEN_STACK_ALLOCATION_LIMIT 128*1024*40 // default 128KB
+
+//#define EIGEN_STACK_ALLOCATION_LIMIT 393216 //(=256*1024), default 128KB, 0 no limits
+#include <Eigen/Dense>
+#include <eigen3/Eigen/Eigen>
+
 #include <ros/ros.h>
 #include <memory>
-#include <eigen3/Eigen/Eigen>
-#include <Eigen/Dense>
 
 namespace neural_network{
 
 using data_type = double;
 typedef Eigen::Matrix<data_type, Eigen::Dynamic, Eigen::Dynamic> MatrixXn;
 typedef Eigen::Matrix<data_type, Eigen::Dynamic, 1> VectorXn;
-//typedef Eigen::MatrixXd MatrixXn;
-//typedef Eigen::VectorXd VectorXn;
 
 class NeuralNetwork;
 typedef std::shared_ptr<NeuralNetwork> NeuralNetworkPtr;
@@ -82,13 +85,33 @@ protected:
    */
   std::vector<std::function<data_type (const data_type&)>> activations_;
 
+  /**
+   * @brief activations_names_ saves the name of the activations of each layer
+   */
+  std::vector<std::string> activations_names_;
+
+  /**
+   * @brief layers_outputs_ saves saves the outputs of each layer. Note that to avoid dynamic memory allocation during computation, the size of matrices is
+   * pre-determined using max_batch_size_;
+   */
+  std::vector<MatrixXn> layers_outputs_;
+
+  /**
+   * @brief max_batch_size_ is used to pre-allocate matrices. Default is 10.
+   */
+  unsigned int max_batch_size_ = 10;
+
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
   /**
    * @brief NeuralNetwork constructor. Then you need to use importFromParam to build the neural network.
+   * @param max_batch_size is the max size of input batch that the network can accept. This is used for pre-allocation in order
+   * to avoid dynamic resize during runtime.
    */
-  NeuralNetwork(){}
+  NeuralNetwork(const uint& max_batch_size = 10):
+    max_batch_size_(max_batch_size)
+  {}
 
   /**
    * @brief NeuralNetwork costructor
@@ -96,12 +119,16 @@ public:
    * @param weights vector of matrix containing the weights of each layer. The i-th matrix in the vector is the weights matrix
    * of the i-th layer. Each j-th row of the i-th matrix is the vector of weights of the j-th neuron of the i-th layer.
    * @param biasis a vector of bias vectors. The i-th element is the bias vector of the i-th layer.
-   * @param activationsis a vector of activation functions. The i-th element is the activation applied to all the neurons of the i-th layer.
+   * @param activations is a vector of activation functions. The i-th element is the activation applied to all the neurons of the i-th layer.
+   * @param outputs a vector of pre-allocated matrix for each layer outputs.
    */
   NeuralNetwork(const std::vector<uint>& topology, const std::vector<MatrixXn>& weights,
-                const std::vector<VectorXn>& bias, const std::vector<std::function<data_type (const data_type&)>>& activations):
-    topology_(topology),weights_(weights),bias_(bias),activations_(activations)
-  {}
+                const std::vector<VectorXn>& bias, const std::vector<std::string>& activations_names,
+                const std::vector<MatrixXn>& outputs):
+    topology_(topology),weights_(weights),bias_(bias),activations_names_(activations_names),layers_outputs_(outputs)
+  {
+    max_batch_size_ = layers_outputs_.back().cols();
+  }
 
   /**
    * @brief importFromParam read the parameters of the neural network from ROS Param.
@@ -128,7 +155,6 @@ public:
 
     uint layer_number = 0;
     int neurons;
-    VectorXn tmp_bias;
     std::string layer_name;
     std::string activation;
     uint n_weights_per_neuron;
@@ -157,8 +183,8 @@ public:
         throw std::runtime_error("bias param can't be read");
       else
       {
-        tmp_bias = Eigen::Map<VectorXn, Eigen::Unaligned>(bias.data(), bias.size());
-        bias_.push_back(tmp_bias);
+        VectorXn bias_vector = Eigen::Map<VectorXn, Eigen::Unaligned>(bias.data(), bias.size());
+        bias_.push_back(bias_vector);
       }
 
       //layer's activations
@@ -166,19 +192,8 @@ public:
         throw std::runtime_error("activation param can't be read");
       else
       {
-        if(activation == "tanh")
-          activations_.push_back([](const data_type& x)->data_type{return std::tanh(x);});
-        else if(activation == "sigmoid")
-          activations_.push_back([](const data_type& x)->data_type{return (1.0/(1.0+exp(-x)));});
-        else if(activation == "relu")
-          activations_.push_back([](const data_type& x)->data_type{
-            if(x<=0.0)
-              return 0;
-            else
-              return x;
-          });
-        else
-          throw std::runtime_error("activation not implemented yet");
+        activations_names_.push_back(activation);
+        activations_.push_back(activationFromName(activation));
       }
 
       //layer's weights
@@ -220,9 +235,36 @@ public:
                  }
                  return true;
                }());
-        layer_number++;
       }
+
+      //layer's outputs
+      MatrixXn layer_outputs(topology_.back(),max_batch_size_);
+      layers_outputs_.push_back(layer_outputs);
+
+      layer_number++;
     }
+  }
+
+  /**
+   * @brief activationFromName creates the function corresponding to the activation name. Add here new activations
+   * @param activation_name the name of the activation function to create
+   * @return the activation function
+   */
+  inline std::function<data_type (const data_type&)> activationFromName(const std::string& activation_name)
+  {
+    if(activation_name == "tanh")
+      return ([](const data_type& x)->data_type{return std::tanh(x);});
+    else if(activation_name == "sigmoid")
+      return ([](const data_type& x)->data_type{return (1.0/(1.0+exp(-x)));});
+    else if(activation_name == "relu")
+      return ([](const data_type& x)->data_type{
+        if(x<=0.0)
+          return 0;
+        else
+          return x;
+      });
+    else
+      throw std::runtime_error("activation not implemented yet");
   }
 
   /**
@@ -230,60 +272,95 @@ public:
    * @param inputs is a matrix of inputs, in which each column is a sample
    * @return the matrix of output, in which each column is a prediction
    */
-  inline MatrixXn forward(MatrixXn inputs)
+  inline MatrixXn forward(const MatrixXn& inputs)
   {
     if(weights_.empty())
       throw std::runtime_error("Neural Network not properly initialized");
 
-    assert(activations_.size() == weights_.size());
+    uint batch_size = inputs.cols(); //number of samples in the input matrix
 
+    if(batch_size>max_batch_size_)
+      throw std::runtime_error("batch size cannot be greater than max_batch_size_ ("+std::to_string(max_batch_size_)+")!");
+
+    assert(activations_.size() == weights_.size());
     // number of layers == weights_.size() (we have a matrix of weights for each layer)
 
-//    ros::WallTime tic, tic_init;
-//    double time1,time2,time3,time;
-
-
-//    ROS_INFO("------------------------------------------");
     for(uint layer=0;layer<weights_.size();layer++)
     {
-      assert(weights_[layer].cols() == inputs  .rows());
       assert(weights_[layer].rows() == bias_[layer].rows());
-      assert(bias_[layer].cols() == 1);
+      assert(bias_   [layer].cols() == 1);
+      assert([&]() ->bool{
+               if(layer == 0)
+               {
+                 if(weights_[layer].cols() == inputs.rows())
+                 return true;
+                 else
+                 return false;
+               }
+               else
+               {
+                 if(weights_[layer].cols() == layers_outputs_[layer-1].rows())
+                 return true;
+                 else
+                 return false;
+               }
+             }());
 
       // | weight11 weight12 weight13 .. |*|sample11 sample21 .. |    weights -> each row is associated to a neuron
       // | weight21 weight22 weight23 .. | |sample12 sample22 .. |    samples -> each col is a sample
       //                                   |sample13 sample23 .. |
 
-      inputs = ((weights_[layer]*inputs).colwise() + bias_[layer]).unaryExpr(activations_[layer]);
+      if(layer == 0)
+      {
+//        Eigen::internal::set_is_malloc_allowed(false);
+        layers_outputs_[layer].topLeftCorner(weights_[layer].rows(),batch_size).noalias() = weights_[layer]*inputs;
+//        Eigen::internal::set_is_malloc_allowed(true);
+      }
+      else
+      {
+//        Eigen::internal::set_is_malloc_allowed(false);
+        layers_outputs_[layer].topLeftCorner(weights_[layer].rows(),batch_size).noalias() =
+            weights_[layer]*(layers_outputs_[layer-1].topLeftCorner(weights_[layer-1].rows(),batch_size));
+//        Eigen::internal::set_is_malloc_allowed(true);
+      }
 
-
-//      tic_init = ros::WallTime::now();
-
-//      tic = ros::WallTime::now();
-//      inputs = weights_[layer]*inputs;
-//      time1 = (ros::WallTime::now()-tic).toSec();
-
-//      tic = ros::WallTime::now();
-//      inputs = inputs.colwise() + bias_[layer];  //bias is applied column-wise
-//      time2 = (ros::WallTime::now()-tic).toSec();
-
-//      tic = ros::WallTime::now();
-//      inputs = inputs.unaryExpr(activations_[layer]);              // activation is applied element-wise
-//      time3 = (ros::WallTime::now()-tic).toSec();
-
-//      time = (ros::WallTime::now()-tic_init).toSec();
-
-//      ROS_INFO_STREAM("time1 "<<(time1/time)*100<<" time2 "<<(time2/time)*100<<" time3 "<<(time3/time)*100);
-
+      layers_outputs_[layer].topLeftCorner(weights_[layer].rows(),batch_size).colwise() += bias_[layer];
+      layers_outputs_[layer].topLeftCorner(weights_[layer].rows(),batch_size).unaryExpr(activations_[layer]);
     }
 
-    return inputs;
+    return layers_outputs_.back().topLeftCorner(weights_.back().rows(),batch_size);
   }
 
   inline NeuralNetworkPtr clone()
   {
-    return std::make_shared<neural_network::NeuralNetwork>(topology_,weights_,bias_,activations_);
+    return std::make_shared<neural_network::NeuralNetwork>(topology_,weights_,bias_,activations_names_,layers_outputs_);
+  }
+
+  friend std::ostream& operator<<(std::ostream& os, const NeuralNetwork& nn)
+  {
+    os<< "Topology: "<<std::endl;
+    os<<"[";
+    for(uint i=0;i<nn.topology_.size();i++)
+    {
+      os<<nn.topology_[i];
+      if(i<nn.topology_.size()-1)
+        os<<", ";
+    }
+    os<<"]"<<std::endl;
+
+    os<< "Activations: "<<std::endl;
+    os<<"[";
+    for(uint i=0;i<nn.activations_names_.size();i++)
+    {
+      os<<nn.activations_names_[i];
+      if(i<nn.activations_names_.size()-1)
+        os<<", ";
+    }
+    os<<"]"<<std::endl;
+
+    return os;
   }
 };
+
 }
 

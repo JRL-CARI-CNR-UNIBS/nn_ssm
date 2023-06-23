@@ -26,8 +26,8 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include <ssm15066_estimators/ssm15066_estimator2D.h>
 #include <nn_ssm/neural_networks/neural_network.h>
+#include <ssm15066_estimators/ssm15066_estimator2D.h>
 
 namespace ssm15066_estimator
 {

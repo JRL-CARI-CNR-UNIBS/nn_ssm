@@ -1,6 +1,6 @@
+#include <nn_ssm/neural_networks/neural_network.h>
 #include <random>
 #include <ros/ros.h>
-#include <nn_ssm/neural_networks/neural_network.h>
 
 int main(int argc, char **argv)
 {
@@ -35,6 +35,8 @@ int main(int argc, char **argv)
   nn.importFromParam(nh,name);
   time = (ros::WallTime::now()-tic).toSec();
   ROS_INFO_STREAM("Imported -> "<<time);
+
+  ROS_INFO_STREAM("NN "<<nn);
 
   tic = ros::WallTime::now();
   neural_network::MatrixXn out = nn.forward(input);

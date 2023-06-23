@@ -1,0 +1,18 @@
+group_name: "manipulator"
+base_frame: "world"
+tool_frame: "open_tip"
+poi_names: ["forearm_link","wrist_1_link","wrist_2_link","open_tip"]
+
+max_cart_acc: 2.5
+Tr: 0.15
+min_distance: 0.2
+v_h: 1.6
+
+n_objects: 1
+min_range: [-1.5,-1.5,0]
+max_range: [ 1.5, 1.5,1.5]
+norm_1: true
+dq_as_input: false
+
+n_iter: 12
+database_name: "ssm_dataset_ur10e"

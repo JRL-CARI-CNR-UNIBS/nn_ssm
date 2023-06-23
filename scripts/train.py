@@ -10,17 +10,16 @@ dof = 6
 load_net = False
 max_scaling = 1000
 fig_name = str(dof)+"dof.png"
+fig_name_dq = str(dof)+"dof_dq.png"
+fig_name_scaling = str(dof)+"dof_scaling.png"
 nn_name = "nn_ssm_complete.pt"
 
-list_dataset_name = ["10k"]
-list_n_epochs = [5000]
-list_batch_size = [32]
-lr_vector = [0.001]
+full_dataset = True
 
-list_dataset_name = ["10k","500k","100k","250k"]
-list_n_epochs = [5000,10000]
-list_batch_size = [32,64]
-lr_vector = [0.001,0.001]
+list_dataset_name = ["0k"]
+list_n_epochs = [30000]
+list_batch_size = [5000]
+lr_vector = [0.001]
 
 perc_train = 0.8
 loss_fcn = ""
@@ -43,6 +42,8 @@ for d in range(len(list_dataset_name)):
   dataset_path = PATH + dataset_name
   nn_path = PATH + list_dataset_name[d] + "_" + nn_name
   fig_path = PATH + list_dataset_name[d] + fig_name
+  fig_path_dq = PATH + list_dataset_name[d] + fig_name_dq
+  fig_path_scaling = PATH + list_dataset_name[d] + fig_name_scaling
 
   # Get cpu or gpu device for training
   device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -72,9 +73,9 @@ for d in range(len(list_dataset_name)):
   target = torch.Tensor(raw_data[:, n_input:]).reshape(rows,n_output)
 
   # random shuffle
-  indices = torch.randperm(input.size()[0])
-  input = input[indices]
-  target = target[indices]
+#   indices = torch.randperm(input.size()[0])
+#   input = input[indices]
+#   target = target[indices]
 
   train_size = int(rows*perc_train)
   val_size = rows-train_size
@@ -84,78 +85,32 @@ for d in range(len(list_dataset_name)):
   val_dataset = torch.utils.data.TensorDataset(
       input[train_size:, :], target[train_size:,:])   # create your validation datset
 
+  if full_dataset:
+     batch_size_train = train_size
+     batch_size_val = val_size
+  else:
+     batch_size_train = batch_size
+     batch_size_val = batch_size
+
   train_dataloader = torch.utils.data.DataLoader(
-      dataset=train_dataset, batch_size=batch_size, shuffle=True, drop_last=True)
+      dataset=train_dataset, batch_size=batch_size_train, shuffle=True, drop_last=True)
   val_dataloader = torch.utils.data.DataLoader(
-      dataset=val_dataset, batch_size=batch_size, shuffle=True, drop_last=True)
+      dataset=val_dataset, batch_size=batch_size_val, shuffle=True, drop_last=True)
 
   if load_net:
       NN = torch.load(nn_path_shared)
   else:
     NN = nn.Sequential(
-    nn.Linear(n_input, 1000),
+    nn.Linear(n_input, 400),
     nn.Tanh(),
-    nn.Linear(1000, n_output),
+    nn.Linear(400, 400),
+    nn.Tanh(),
+    nn.Linear(400, 400),
+    nn.Tanh(),
+    nn.Linear(400, n_output),
     nn.Sigmoid()
     ).to(device)
     load_net = True
-     
-    # NN = nn.Sequential(
-    # nn.Linear(n_input, 1500),
-    # nn.Tanh(),
-    # nn.Dropout(0.5),
-    # nn.Linear(1500, 1500),
-    # nn.Tanh(),
-    # nn.Dropout(0.3),
-    # nn.Linear(1500, n_output),
-    # nn.Sigmoid()
-    # ).to(device)
-    # load_net = True
-
-    #         NN = nn.Sequential(
-    #       nn.Linear(n_input, 1000),
-    #       nn.Tanh(),
-    #       nn.Dropout(0.1),
-    #       nn.Linear(1000, 500),
-    #       nn.Tanh(),
-    #       nn.Dropout(0.01),
-    #       nn.Linear(500, n_output),
-    #       nn.Sigmoid()
-    #   ).to(device)
-
-    #       NN = nn.Sequential(
-    #       nn.Linear(n_input, 4000),
-    #       nn.Tanh(),
-    #       nn.Dropout(0.05),
-    #       nn.Linear(4000, 3000),
-    #       nn.Tanh(),
-    #       nn.Dropout(0.05),
-    #       nn.Linear(3000, 2000),
-    #       nn.Tanh(),
-    #       nn.Dropout(0.05),
-    #       nn.Linear(2000, 1000),
-    #       nn.Tanh(),
-    #       nn.Dropout(0.05),
-    #       nn.Linear(1000, n_output),
-    #       nn.Sigmoid()
-    #   ).to(device)
-    #   load_net = True
-
-    #   NN = nn.Sequential(
-    #   nn.Linear(n_input, 7000),
-    #   nn.Tanh(),
-    #   nn.Dropout(0.1),
-    #   nn.Linear(7000, 3000),
-    #   nn.Tanh(),
-    #   nn.Dropout(0.05),
-    #   nn.Linear(3000, 1000),
-    #   nn.Tanh(),
-    #   nn.Dropout(0.01),
-    #   nn.Linear(1000, 100),
-    #   nn.Tanh(),
-    #   nn.Linear(100, n_output),
-    #   nn.Sigmoid()
-    # ).to(device)
 
   print(NN)
 
@@ -177,8 +132,10 @@ for d in range(len(list_dataset_name)):
   train_loss_over_epoches = []
 
   plt.rcParams["figure.figsize"] = [12, 15]
-  ax = plt.GridSpec(7, 2)
-  ax.update(wspace=1, hspace=1.5)
+
+  plt.figure(1)
+  ax = plt.GridSpec(3, 2)
+  ax.update(wspace=0.5, hspace=0.5)
 
   ax0 = plt.subplot(ax[0, :])
   ax1 = plt.subplot(ax[1, 0])
@@ -186,15 +143,30 @@ for d in range(len(list_dataset_name)):
   ax3 = plt.subplot(ax[2, 0])
   ax4 = plt.subplot(ax[2, 1])
 
-  ax5 = plt.subplot(ax[3, 0])
-  ax6 = plt.subplot(ax[3, 1])
-  ax7 = plt.subplot(ax[4, 0])
-  ax8 = plt.subplot(ax[4, 1])
+  plt.figure(2)
+  ax = plt.GridSpec(4, 2)
+  ax.update(wspace=0.5, hspace=1)
 
-  ax9  = plt.subplot(ax[5, 0])
-  ax10 = plt.subplot(ax[5, 1])
-  ax11 = plt.subplot(ax[6, 0])
-  ax12 = plt.subplot(ax[6, 1])
+  ax5 = plt.subplot(ax[0, 0])
+  ax6 = plt.subplot(ax[0, 1])
+  ax7 = plt.subplot(ax[1, 0])
+  ax8 = plt.subplot(ax[1, 1])
+
+  ax9  = plt.subplot(ax[2, 0])
+  ax10 = plt.subplot(ax[2, 1])
+  ax11 = plt.subplot(ax[3, 0])
+  ax12 = plt.subplot(ax[3, 1])
+
+  plt.figure(3)
+  ax = plt.GridSpec(3, 2)
+  ax.update(wspace=0.5, hspace=0.5)
+
+  ax13 = plt.subplot(ax[0, 0])
+  ax14 = plt.subplot(ax[0, 1])
+  ax15 = plt.subplot(ax[1, 0])
+  ax16 = plt.subplot(ax[1, 1])
+  ax17 = plt.subplot(ax[2, 0])
+  ax18 = plt.subplot(ax[2, 1])
 
   for epoch in range(n_epochs):
       # Training phase
@@ -224,14 +196,14 @@ for d in range(len(list_dataset_name)):
           predictions = NN(batch_input)
 
           # backpropagation
-        #   loss = criterion(predictions, batch_targets)
-          loss = criterion(predictions**3, batch_targets**3)
+          loss = criterion(predictions, batch_targets)
+        #   loss = criterion(predictions**3, batch_targets**3)
           loss.backward()
 
           optimizer.step()
 
           # print current performance
-          train_loss_per_epoch += (loss.item()*batch_targets.size()[0])
+          train_loss_per_epoch += loss.item()
 
           batches_loss += loss.item()
           if i % freq_batch == freq_batch-1:    # print every freq_batch mini-batches
@@ -264,6 +236,13 @@ for d in range(len(list_dataset_name)):
               val_poi_y =  []
               val_poi_z =  []
 
+              val_dq_1 = []
+              val_dq_2 = []
+              val_dq_3 = []
+              val_dq_4 = []
+              val_dq_5 = []
+              val_dq_6 = []
+
               val_target_scaling_mid = []
               val_target_speed_mid = []
               val_target_dist_mid = []
@@ -273,6 +252,13 @@ for d in range(len(list_dataset_name)):
               val_target_poi_x =  []
               val_target_poi_y =  []
               val_target_poi_z =  []
+
+              val_target_dq_1 = []
+              val_target_dq_2 = []
+              val_target_dq_3 = []
+              val_target_dq_4 = []
+              val_target_dq_5 = []
+              val_target_dq_6 = []
 
               batches_loss = 0.0
 
@@ -284,10 +270,10 @@ for d in range(len(list_dataset_name)):
                   batch_targets = batch_targets.to(device)
 
                   predictions = NN(batch_input)
-                #   loss = criterion(predictions, batch_targets)
-                  loss = criterion(predictions**3, batch_targets**3)
-
-                  val_loss_per_epoch += (loss.item()*batch_targets.size()[0])
+                  loss = criterion(predictions, batch_targets)
+                #   loss = criterion(predictions**3, batch_targets**3)
+                  
+                  val_loss_per_epoch += loss.item()
 
                   batches_loss += loss.item()
                   if i % freq_batch == freq_batch-1:    # print every 1000 mini-batches
@@ -322,6 +308,26 @@ for d in range(len(list_dataset_name)):
 
                   val_poi_z.extend(predictions[:,-23].detach().cpu().numpy())
                   val_target_poi_z.extend(batch_targets[:,-23].detach().cpu().numpy())
+
+                  ####################################################################à
+
+                  val_dq_1.extend(predictions[:,-19].detach().cpu().numpy())
+                  val_target_dq_1.extend(batch_targets[:,-19].detach().cpu().numpy())
+                  
+                  val_dq_2.extend(predictions[:,-18].detach().cpu().numpy())
+                  val_target_dq_2.extend(batch_targets[:,-18].detach().cpu().numpy())
+
+                  val_dq_3.extend(predictions[:,-17].detach().cpu().numpy())
+                  val_target_dq_3.extend(batch_targets[:,-17].detach().cpu().numpy())
+
+                  val_dq_4.extend(predictions[:,-16].detach().cpu().numpy())
+                  val_target_dq_4.extend(batch_targets[:,-16].detach().cpu().numpy())
+
+                  val_dq_5.extend(predictions[:,-15].detach().cpu().numpy())
+                  val_target_dq_5.extend(batch_targets[:,-15].detach().cpu().numpy())
+
+                  val_dq_6.extend(predictions[:,-14].detach().cpu().numpy())
+                  val_target_dq_6.extend(batch_targets[:,-14].detach().cpu().numpy())
 
 
       print("-----------------------------------------------------------")
@@ -418,14 +424,65 @@ for d in range(len(list_dataset_name)):
           ax12.grid(True)
           ax12.plot(val_target_poi_z, val_poi_z, '.')
 
+          ax13.clear()
+          ax13.set(xlabel="Target", ylabel="Prediction",
+                  title="Dq")
+          ax13.grid(True)
+          ax13.plot(val_target_dq_1, val_dq_1, '.')
+
+          ax14.clear()
+          ax14.set(xlabel="Target", ylabel="Prediction",
+                  title="Dq")
+          ax14.grid(True)
+          ax14.plot(val_target_dq_2, val_dq_2, '.')
+
+          ax15.clear()
+          ax15.set(xlabel="Target", ylabel="Prediction",
+                  title="Dq")
+          ax15.grid(True)
+          ax15.plot(val_target_dq_3, val_dq_3, '.')
+
+          ax16.clear()
+          ax16.set(xlabel="Target", ylabel="Prediction",
+                  title="Dq")
+          ax16.grid(True)
+          ax16.plot(val_target_dq_4, val_dq_4, '.')
+
+          ax17.clear()
+          ax17.set(xlabel="Target", ylabel="Prediction",
+                  title="Dq")
+          ax17.grid(True)
+          ax17.plot(val_target_dq_5, val_dq_5, '.')
+
+          ax18.clear()
+          ax18.set(xlabel="Target", ylabel="Prediction",
+                  title="Dq")
+          ax18.grid(True)
+          ax18.plot(val_target_dq_6, val_dq_6, '.')
+
+          plt.figure(1)
           plt.show(block=False)
           plt.draw()
           plt.pause(0.0001)
           plt.savefig(fig_path, dpi=300)
 
+          plt.figure(2)
+          plt.show(block=False)
+          plt.draw()
+          plt.pause(0.0001)
+          plt.savefig(fig_path_scaling, dpi=300)
+
+          plt.figure(3)
+          plt.show(block=False)
+          plt.draw()
+          plt.pause(0.0001)
+          plt.savefig(fig_path_dq, dpi=300)
+
       # Save NN at each epoch
       NN = NN.eval()
       torch.save(NN, nn_path_shared)
       torch.save(NN, nn_path)
+      if epoch % 5000 == 4999:
+        torch.save(NN, nn_path+"_"+str(epoch/1000)+"k_epochs")
 
 

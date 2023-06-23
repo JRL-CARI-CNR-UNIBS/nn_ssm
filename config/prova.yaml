@@ -1,0 +1,3 @@
+n_neurons: 100  # max 178
+n_input: 15    # max 178
+batch_size: 10

@@ -63,6 +63,9 @@ int main(int argc, char **argv)
   int n_threads;
   nh.getParam("ssm_n_threads",n_threads);
 
+  int batch_size;
+  nh.getParam("batch_size",batch_size);
+
   std::string name;
   if(not nh.getParam("namespace",name))
   {
@@ -109,7 +112,7 @@ int main(int argc, char **argv)
   parallel_ssm->setPoiNames(poi_names);
   parallel_ssm->updateMembers();
 
-  neural_network::NeuralNetwork nn;
+  neural_network::NeuralNetwork nn(batch_size);
 
   ROS_INFO("Importing neural network");
   ros::WallTime tic = ros::WallTime::now();

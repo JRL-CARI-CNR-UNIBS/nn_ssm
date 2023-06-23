@@ -49,6 +49,25 @@ target_link_libraries(create_dataset_connection
  ${catkin_LIBRARIES}
 )
 
+add_executable(create_dataset_scaling_simple src/create_dataset_scaling_simple.cpp)
+add_dependencies(create_dataset_scaling_simple ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(create_dataset_scaling_simple
+ ${catkin_LIBRARIES}
+)
+
+
+add_executable(create_dataset_distance src/create_dataset_distance.cpp)
+add_dependencies(create_dataset_distance ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(create_dataset_distance
+ ${catkin_LIBRARIES}
+)
+
+add_executable(create_dataset_distance_single src/create_dataset_distance_single.cpp)
+add_dependencies(create_dataset_distance_single ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(create_dataset_distance_single
+ ${catkin_LIBRARIES}
+)
+
 add_executable(nn_test src/neural_networks/nn_test.cpp)
 add_dependencies(nn_test ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 target_link_libraries(nn_test
@@ -64,5 +83,11 @@ target_link_libraries(nn_test_speed
 add_executable(compare_speed src/neural_networks/compare_speed.cpp)
 add_dependencies(compare_speed ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 target_link_libraries(compare_speed
+ ${catkin_LIBRARIES}
+)
+
+add_executable(prova src/prova.cpp)
+add_dependencies(prova ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(prova
  ${catkin_LIBRARIES}
 )

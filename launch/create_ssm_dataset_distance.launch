@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<launch>
+  <include file="$(find replanners_bench_cells)/launch/cell.launch">
+    <arg name="demo_package" value="high_dof_6_moveit_config"/>
+    <arg name="static_scene" value="static_scene_plane.yaml"/>
+    <arg name="rviz"         value="$(find replanners_bench_cells)/config/rviz_crash_test_6d_config.rviz"/>
+  </include>
+
+  <rosparam command="load" file="$(find nn_ssm)/config/create_ssm_database_distance.yaml"/>
+
+  <node pkg="nn_ssm"
+        name="create_dataset_distance"
+        type="create_dataset_distance"
+        output="screen"
+        launch-prefix="gdb -ex run --args"> 
+ </node>
+
+</launch>

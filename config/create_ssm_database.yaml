@@ -11,8 +11,10 @@ v_h: 1.6
 n_objects: 1
 min_range: [-1.5,-1.5,0]
 max_range: [ 1.5, 1.5,1.5]
-max_tang_speed: 42
-max_distance: 4.3
+
+normalize: false
+norm_1: true
+dq_as_input: false
 
 n_iter: 500000
-database_name: "ssm_dataset"
+database_name: "ssm_dataset_connection"
